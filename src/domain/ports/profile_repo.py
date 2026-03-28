@@ -1,0 +1,9 @@
+from typing import Protocol
+
+from src.domain.entities import UserProfile
+
+
+class IProfileRepository(Protocol):
+    async def get(self, telegram_id: int) -> UserProfile | None: ...
+    async def save(self, profile: UserProfile) -> None: ...
+    async def all_with_reminders(self) -> list[UserProfile]: ...
