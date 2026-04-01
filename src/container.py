@@ -4,10 +4,10 @@ from dishka import Provider, Scope, make_async_container, provide
 
 from src.application.agent.core import CardBackend, LessonAgent
 from src.config import Settings
-from src.infrastructure.integrations.anki_client import AnkiClient
-from src.infrastructure.integrations.dw_fetcher import DWArticleFetcher
-from src.infrastructure.integrations.llm_client import LLMClient
-from src.infrastructure.integrations.mochi_client import MochiClient
+from src.infrastructure.card_backends.anki import AnkiClient
+from src.infrastructure.card_backends.mochi import MochiClient
+from src.infrastructure.fetchers.german.dw import DWArticleFetcher
+from src.infrastructure.llm.client import LLMClient
 from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
 from src.infrastructure.repositories.json_session_repo import JsonSessionRepository
 
