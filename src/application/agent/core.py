@@ -1,10 +1,13 @@
+import logging
 from dataclasses import dataclass
+from enum import Enum
 
 from src.application.agent.prompts import (
     build_review_prompt,
     build_system_prompt,
     build_topic_vocab_prompt,
     build_vocab_prompt,
+    build_word_capture_prompt,
     build_writing_review_prompt,
     build_writing_task_prompt,
     lang_name,
@@ -24,6 +27,14 @@ class LessonResult:
     questions: list[str]
     feedback: str
     cards_created: list[VocabCard]
+
+
+class CardBackend(Enum):
+    MOCHI = "mochi"
+    ANKI = "anki"
+
+
+logger = logging.getLogger(__name__)
 
 
 class LessonAgent:
@@ -66,8 +77,8 @@ class LessonAgent:
                     f"Goal: {goal}. Native language: {lang_name(native_lang)}. "
                     f"{history_note}\n\n"
                     f"1. Fetch a {lang_name(target_lang)} article\n"
-                    f"2. Return EXACTLY 3 comprehension questions IN {lang_name(target_lang).upper()} "
-                    f"(numbered 1. 2. 3.)\n"
+                    f"2. Return EXACTLY 3 comprehension questions IN "
+                    f"{lang_name(target_lang).upper()} (numbered 1. 2. 3.)\n"
                     "Do not do anything else yet."
                 ),
             ),
@@ -150,10 +161,16 @@ class LessonAgent:
         """Return a writing task prompt string based on the article (no tools needed)."""
         messages = [
             Message(role="system", content=build_system_prompt(target_lang)),
-            Message(role="user", content=build_writing_task_prompt(article_text, target_lang, level, mode)),
+            Message(
+                role="user",
+                content=build_writing_task_prompt(article_text, target_lang, level, mode),
+            ),
         ]
         response = await self._llm.complete(messages, tools=[])
-        return response.content or "Write 2–3 sentences about something you found interesting in the article."
+        return (
+            response.content
+            or "Write 2–3 sentences about something you found interesting in the article."
+        )
 
     async def review_writing(
         self,
@@ -207,7 +224,9 @@ class LessonAgent:
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(
                 role="user",
-                content=build_topic_vocab_prompt(level, goal, target_lang, native_lang, recent_topics),
+                content=build_topic_vocab_prompt(
+                    level, goal, target_lang, native_lang, recent_topics
+                ),
             ),
         ]
         topic_name = "Vocabulary"
@@ -251,6 +270,65 @@ class LessonAgent:
                 continue
             break
         return tools.created_cards
+
+    async def capture_word(
+        self,
+        word: str,
+        target_lang: str,
+        native_lang: str,
+    ) -> VocabCard:
+        """Capture a single word: call LLM to generate card data, create card in backend."""
+        import json
+
+        word = word.strip()
+        if not word:
+            raise ValueError("No word provided")
+
+        messages = [
+            Message(role="system", content=build_system_prompt(target_lang)),
+            Message(
+                role="user",
+                content=build_word_capture_prompt(word, target_lang, native_lang),
+            ),
+        ]
+        response = await self._llm.complete(messages, tools=[], temperature=0.3)
+
+        raw = (response.content or "").strip()
+        if not raw:
+            raise ValueError("LLM returned empty response for word capture")
+
+        # Strip markdown code fences if LLM adds them despite instructions
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            raw = "\n".join(lines[1:-1]) if len(lines) > 2 else raw
+
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"LLM returned non-JSON for word capture: {e}") from e
+
+        required = {"word", "word_type", "translation", "example_sentence"}
+        missing = required - data.keys()
+        if missing:
+            raise ValueError(f"LLM response missing fields: {missing}")
+
+        card = VocabCard(
+            word=data["word"],
+            translation=data["translation"],
+            example_sentence=data["example_sentence"],
+            word_type=data["word_type"],
+            article=data.get("article"),
+        )
+
+        backend_id = await self._anki.create_card(card)
+        return VocabCard(
+            word=card.word,
+            translation=card.translation,
+            example_sentence=card.example_sentence,
+            word_type=card.word_type,
+            article=card.article,
+            backend_id=backend_id,
+        )
 
     def _parse_questions(self, text: str) -> list[str]:
         import re

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from dishka import Provider, Scope, make_async_container, provide
 
-from src.application.agent.core import LessonAgent
+from src.application.agent.core import CardBackend, LessonAgent
 from src.config import Settings
 from src.infrastructure.integrations.anki_client import AnkiClient
 from src.infrastructure.integrations.dw_fetcher import DWArticleFetcher
@@ -17,7 +17,7 @@ class AppProvider(Provider):
 
     @provide
     def settings(self) -> Settings:
-        return Settings()
+        return Settings()  # ty : ignore
 
     @provide
     def data_dir(self, settings: Settings) -> Path:
@@ -51,12 +51,14 @@ class AppProvider(Provider):
 
     @provide
     def card_gateway(self, settings: Settings) -> AnkiClient | MochiClient:
-        if settings.card_backend == "mochi":
-            return MochiClient(
-                api_key=settings.mochi_api_key.get_secret_value(),
-                deck_id=settings.mochi_deck_id,
-            )
-        return AnkiClient(settings.anki_connect_url, deck=settings.anki_deck)
+        match CardBackend(settings.card_backend):
+            case CardBackend.ANKI:
+                return AnkiClient(settings.anki_connect_url, deck=settings.anki_deck)
+            case CardBackend.MOCHI:
+                return MochiClient(
+                    api_key=settings.mochi_api_key.get_secret_value(),
+                    deck_id=settings.mochi_deck_id,
+                )
 
     @provide
     def agent(

@@ -377,7 +377,7 @@ async def handle_delete_card(
     cards = _last_cards.get(user_id, [])
     action = callback.data.split(":", 1)[1]  # type: ignore
 
-    gateway: ICardGateway = agent._anki  # type: ignore
+    gateway: ICardGateway = agent._anki
 
     if action == "all":
         for card in cards:

@@ -52,7 +52,7 @@ def _parse_rss_items(xml_text: str) -> list[ET.Element]:
     return items
 
 
-class NewsArticleFetcher:
+class NewsArticleFetcher(IArticleFetcher):
     """Fetches news articles from RSS feeds. The agent decides which source URL to use."""
 
     def __init__(self) -> None:

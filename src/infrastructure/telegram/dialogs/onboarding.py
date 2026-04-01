@@ -10,7 +10,6 @@ from aiogram_dialog.widgets.text import Const, Format
 from src.infrastructure.telegram.handlers.onboarding_finish import save_profile_on_confirm
 from src.infrastructure.telegram.states import OnboardingSG
 
-
 # ── target language (buttons only — fixed set) ────────────────────────────────
 
 async def on_target_lang(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:

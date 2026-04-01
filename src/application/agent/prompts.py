@@ -281,6 +281,27 @@ def build_writing_review_prompt(
     )
 
 
+def build_word_capture_prompt(word: str, target_lang: str, native_lang: str) -> str:
+    name = lang_name(target_lang)
+    native_name = lang_name(native_lang)
+    return (
+        f"The student is learning {name} and wants to add '{word}' to their flashcard deck.\n\n"
+        f"Respond with ONLY a JSON object (no markdown, no code fences, no extra text) with these fields:\n"
+        f"  word: the {name} word exactly as given\n"
+        f"  article: grammatical article if noun (e.g. der/die/das for German, el/la for Spanish) — null if not a noun\n"
+        f"  word_type: one of noun / verb / adjective / phrase\n"
+        f"  translation: {native_name} translation\n"
+        f"  example_sentence: one natural {name} sentence using the word\n"
+        f"  grammar_note: one short note useful for learners "
+        f"(e.g. plural form for nouns, key conjugation for verbs) written in {native_name}. Max 1 sentence.\n\n"
+        f'Example for "Brot" (German \u2192 English):\n'
+        f'{{"word":"Brot","article":"das","word_type":"noun","translation":"bread",'
+        f'"example_sentence":"Ich esse jeden Morgen frisches Brot.",'
+        f'"grammar_note":"Plural: die Brote"}}\n\n'
+        f"Now generate the JSON for '{word}'."
+    )
+
+
 def build_review_prompt(
     article_text: str,
     questions: list[str],
