@@ -4,6 +4,7 @@ import httpx
 
 from src.domain.entities import VocabCard
 from src.domain.ports.card_gateway import ICardGateway
+from src.infrastructure.exceptions import CardBackendError
 
 _BASE_URL = "https://app.mochi.cards/api"
 
@@ -44,7 +45,6 @@ class MochiClient:
                 return None
             tmpl_resp = await self._client.get(f"/templates/{template_id}")
             fields: dict = tmpl_resp.json().get("fields", {})
-            # The back field is the first field that isn't the standard "name" (front) field
             back_id = next((fid for fid in fields if fid != "name"), None)
             if back_id:
                 self._back_field_id = back_id
@@ -74,21 +74,22 @@ class MochiClient:
                 card_id = resp.json().get("id")
                 logger.info("Mochi: card created word=%r id=%r", card.word, card_id)
                 return card_id
-            logger.warning(
-                "Mochi create_card failed: status=%d body=%r", resp.status_code, resp.text[:300]
-            )
-            return None
+            raise CardBackendError(f"Mochi {resp.status_code}: {resp.text[:200]}")
+        except CardBackendError:
+            raise
         except Exception as exc:
-            logger.error("Mochi create_card exception: %s", exc)
-            return None
+            raise CardBackendError(f"Mochi request failed: {exc}") from exc
 
     async def delete_card(self, card_id: str) -> bool:
         try:
             resp = await self._client.delete(f"/cards/{card_id}")
-            return resp.status_code in (200, 204)
+            if resp.status_code not in (200, 204):
+                raise CardBackendError(f"Mochi delete {resp.status_code}: {card_id}")
+            return True
+        except CardBackendError:
+            raise
         except Exception as exc:
-            logger.error("Mochi delete_card exception: id=%r %s", card_id, exc)
-            return False
+            raise CardBackendError(f"Mochi delete failed: {exc}") from exc
 
     def _build_front(self, card: VocabCard) -> str:
         if card.word_type == "noun" and card.article:

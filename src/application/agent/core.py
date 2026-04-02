@@ -14,9 +14,11 @@ from src.application.agent.prompts import (
 )
 from src.application.agent.tools import READING_TOOL_SCHEMAS, TOOL_SCHEMAS, AgentTools
 from src.domain.entities import VocabCard
+from src.domain.exceptions import WordCaptureError
 from src.domain.ports.article_fetcher import IArticleFetcher
 from src.domain.ports.card_gateway import ICardGateway
 from src.domain.ports.llm_gateway import ILLMGateway, Message
+from src.infrastructure.exceptions import CardBackendError, LLMError
 
 
 @dataclass
@@ -282,7 +284,7 @@ class LessonAgent:
 
         word = word.strip()
         if not word:
-            raise ValueError("No word provided")
+            raise WordCaptureError("No word provided")
 
         messages = [
             Message(role="system", content=build_system_prompt(target_lang)),
@@ -291,11 +293,14 @@ class LessonAgent:
                 content=build_word_capture_prompt(word, target_lang, native_lang),
             ),
         ]
-        response = await self._llm.complete(messages, tools=[], temperature=0.3)
+        try:
+            response = await self._llm.complete(messages, tools=[], temperature=0.3)
+        except LLMError as e:
+            raise WordCaptureError(f"LLM failed for '{word}': {e}") from e
 
         raw = (response.content or "").strip()
         if not raw:
-            raise ValueError("LLM returned empty response for word capture")
+            raise WordCaptureError(f"LLM returned empty response for '{word}'")
 
         # Strip markdown code fences if LLM adds them despite instructions
         if raw.startswith("```"):
@@ -305,12 +310,12 @@ class LessonAgent:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            raise ValueError(f"LLM returned non-JSON for word capture: {e}") from e
+            raise WordCaptureError(f"LLM returned non-JSON for '{word}': {e}") from e
 
         required = {"word", "word_type", "translation", "example_sentence"}
         missing = required - data.keys()
         if missing:
-            raise ValueError(f"LLM response missing fields: {missing}")
+            raise WordCaptureError(f"LLM response missing fields: {missing}")
 
         card = VocabCard(
             word=data["word"],
@@ -320,7 +325,10 @@ class LessonAgent:
             article=data.get("article"),
         )
 
-        backend_id = await self._anki.create_card(card)
+        try:
+            backend_id = await self._anki.create_card(card)
+        except CardBackendError as e:
+            raise WordCaptureError(f"Card backend failed for '{word}': {e}") from e
         return VocabCard(
             word=card.word,
             translation=card.translation,

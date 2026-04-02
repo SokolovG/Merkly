@@ -10,6 +10,7 @@ from typing import Any, TypeVar
 import httpx
 
 from src.domain.ports.article_fetcher import Article, IArticleFetcher
+from src.infrastructure.exceptions import FetcherError
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class NewsArticleFetcher(IArticleFetcher):
 
         items = _parse_rss_items(resp.text)
         if not items:
-            raise ValueError(f"No items found in RSS feed: {feed_url}")
+            raise FetcherError(f"No items found in RSS feed: {feed_url}")
 
         item = random.choice(items[:10])
 
@@ -95,7 +96,7 @@ class NewsArticleFetcher(IArticleFetcher):
             text = await self._fetch_page_text(link) or text
 
         if len(text.split()) < 20:
-            raise ValueError(f"Article text too short from {feed_url}")
+            raise FetcherError(f"Article text too short from {feed_url}")
 
         logger.info("Fetched article: '%s' from %s", title, feed_url)
         return Article(url=link or feed_url, title=title, text=_truncate(text), level=level)

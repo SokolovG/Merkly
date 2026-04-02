@@ -2,6 +2,7 @@ import httpx
 
 from src.domain.entities import VocabCard
 from src.domain.ports.card_gateway import ICardGateway
+from src.infrastructure.exceptions import CardBackendError
 
 
 class AnkiClient:
@@ -40,10 +41,14 @@ class AnkiClient:
         try:
             resp = await self._client.post(self._url, json=payload)
             result = resp.json()
+            if result.get("error"):
+                raise CardBackendError(f"Anki error: {result['error']}")
             note_id = result.get("result")
-            return str(note_id) if note_id and result.get("error") is None else None
-        except Exception:
-            return None
+            return str(note_id) if note_id else None
+        except CardBackendError:
+            raise
+        except Exception as exc:
+            raise CardBackendError(f"Anki request failed: {exc}") from exc
 
     async def delete_card(self, card_id: str) -> bool:
         payload = {
@@ -53,9 +58,13 @@ class AnkiClient:
         }
         try:
             resp = await self._client.post(self._url, json=payload)
-            return resp.json().get("error") is None
-        except Exception:
-            return False
+            if resp.json().get("error"):
+                raise CardBackendError(f"Anki delete error: {resp.json()['error']}")
+            return True
+        except CardBackendError:
+            raise
+        except Exception as exc:
+            raise CardBackendError(f"Anki delete failed: {exc}") from exc
 
     def _build_front(self, card: VocabCard) -> str:
         if card.word_type == "noun" and card.article:
