@@ -3,6 +3,7 @@ import json
 import openai
 
 from src.domain.ports.llm_gateway import ILLMGateway, LLMResponse, Message, ToolCall
+from src.infrastructure.exceptions import LLMError
 
 
 class LLMClient:
@@ -36,8 +37,18 @@ class LLMClient:
             kwargs["tools"] = tools
             kwargs["tool_choice"] = "auto"
 
-        response = await self._client.chat.completions.create(**kwargs)
+        try:
+            response = await self._client.chat.completions.create(**kwargs)
+        except openai.APITimeoutError as exc:
+            raise LLMError(f"LLM request timed out: {exc}") from exc
+        except openai.APIStatusError as exc:
+            raise LLMError(f"LLM API error {exc.status_code}: {exc.message}") from exc
+        except openai.APIError as exc:
+            raise LLMError(f"LLM API error: {exc}") from exc
+
         msg = response.choices[0].message
+        if msg is None:
+            raise LLMError("LLM returned empty response")
 
         tool_calls = []
         if msg.tool_calls:

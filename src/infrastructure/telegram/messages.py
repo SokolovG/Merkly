@@ -1,0 +1,166 @@
+from html import escape
+
+# --- Onboarding / profile ---
+
+
+def welcome_back(level: str, goal: str) -> str:
+    return (
+        f"Welcome back! 👋\n"
+        f"Your level: {level} | Goal: {goal}\n\n"
+        "Type /session to start today's lesson."
+    )
+
+
+def no_profile() -> str:
+    return "Please set up your profile first. Type /start"
+
+
+def complete_setup() -> str:
+    return "Please complete setup first — type /start"
+
+
+# --- Session ---
+
+
+def preparing_lesson() -> str:
+    return "Preparing your lesson... ⏳"
+
+
+def lesson_failed(error: str) -> str:
+    return f"Failed to prepare lesson: {error}\nPlease try again."
+
+
+def reviewing_answers() -> str:
+    return "Reviewing your answers... 🤔"
+
+
+def session_expired() -> str:
+    return "Session expired. Start a new /session."
+
+
+# --- Writing exercise ---
+
+
+def preparing_writing() -> str:
+    return "Preparing your writing task... ✍️"
+
+
+def reviewing_writing() -> str:
+    return "Reviewing your writing... 🤔"
+
+
+def writing_cards_header(count: int) -> str:
+    return f"🃏 <b>Flashcards saved ({count}):</b>"
+
+
+# --- Vocab ---
+
+
+def fetching_vocab() -> str:
+    return "Fetching vocabulary for you... ⏳"
+
+
+def vocab_failed(error: str) -> str:
+    return f"Failed to fetch vocabulary: {error}\nPlease try again."
+
+
+def vocab_empty() -> str:
+    return "Couldn't generate vocabulary this time. Try /vocab again."
+
+
+def vocab_header(topic: str, count: int) -> str:
+    return f"🃏 <b>{escape(topic)} ({count} words):</b>"
+
+
+def skipping_to_vocab() -> str:
+    return "Skipping reading... fetching vocabulary instead ⏳"
+
+
+def vocab_fetch_failed() -> str:
+    return "Couldn't fetch vocabulary. Try /vocab again."
+
+
+def vocab_not_found() -> str:
+    return "No vocabulary found. Try /vocab again."
+
+
+# --- Word capture ---
+
+
+def looking_up(word: str) -> str:
+    return f"Looking up <b>{escape(word)}</b>... ⏳"
+
+
+def word_empty() -> str:
+    return "Please add a word after +, e.g. <b>+Brot</b>"
+
+
+def card_saved(display_word: str, translation: str, example: str) -> str:
+    return (
+        f"✅ <b>{escape(display_word)}</b> — {escape(translation)}\n"
+        f"<i>{escape(example)}</i>\n"
+        "📥 Saved to your deck"
+    )
+
+
+def card_saved_no_backend(display_word: str, translation: str, example: str) -> str:
+    return (
+        f"✅ <b>{escape(display_word)}</b> — {escape(translation)}\n"
+        f"<i>{escape(example)}</i>\n"
+        "⚠️ Card saved locally (deck not connected)"
+    )
+
+
+def word_capture_failed(word: str) -> str:
+    return f"Couldn't generate a card for <b>{escape(word)}</b>. Try again or check the spelling."
+
+
+def word_capture_error() -> str:
+    return "Something went wrong adding the card. Please try again."
+
+
+# --- Cards keyboard labels ---
+
+
+def delete_card_label(word: str) -> str:
+    return f"🗑 {word}"
+
+
+def delete_all_label() -> str:
+    return "🗑 Delete all"
+
+
+def card_deleted(word: str) -> str:
+    return f"Deleted: {word}"
+
+
+def all_cards_deleted() -> str:
+    return "All cards deleted."
+
+
+def card_not_found() -> str:
+    return "Card not found."
+
+
+# --- Help ---
+
+
+def help_text() -> str:
+    return (
+        "📚 <b>Language Tutor — Commands</b>\n\n"
+        "/session — Start today's lesson (article + 3 questions)\n"
+        "/vocab — Goal-aware vocabulary cards (8 words, topic rotates)\n"
+        "/skip — Same as /vocab\n"
+        "/settings — Update your profile (language, level, goal)\n"
+        "/help — Show this message\n\n"
+        "📖 How a session works:\n"
+        "1. Bot fetches an article in your target language\n"
+        "2. Answer 3 comprehension questions\n"
+        "3. Get honest feedback (no cards from reading)\n"
+        "4. Choose a writing exercise:\n"
+        "   ✍️ Sentences — 2–3 sentences with article words\n"
+        "   📝 Grammar — practice a grammar structure\n"
+        "   📰 Essay — 200+ word formal text (exam prep)\n"
+        "5. Writing feedback + flashcards from your mistakes\n\n"
+        "🃏 Cards can be deleted with the buttons below each card list."
+    )

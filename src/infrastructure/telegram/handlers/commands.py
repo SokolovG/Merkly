@@ -14,6 +14,30 @@ from src.domain.entities import Session, VocabCard
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
 from src.infrastructure.repositories.json_session_repo import JsonSessionRepository
+from src.infrastructure.telegram.messages import (
+    all_cards_deleted,
+    card_deleted,
+    card_not_found,
+    delete_all_label,
+    delete_card_label,
+    fetching_vocab,
+    help_text,
+    lesson_failed,
+    no_profile,
+    preparing_lesson,
+    preparing_writing,
+    reviewing_answers,
+    reviewing_writing,
+    session_expired,
+    skipping_to_vocab,
+    vocab_empty,
+    vocab_failed,
+    vocab_fetch_failed,
+    vocab_header,
+    vocab_not_found,
+    welcome_back,
+    writing_cards_header,
+)
 from src.infrastructure.telegram.states import OnboardingSG
 
 router = Router()
@@ -42,9 +66,8 @@ def _cards_keyboard(cards: list[VocabCard]) -> InlineKeyboardMarkup:
     """Inline keyboard with a delete button per card + delete all."""
     buttons = []
     for i, card in enumerate(cards):
-        label = f"🗑 {card.word}"
-        buttons.append([InlineKeyboardButton(text=label, callback_data=f"delcard:{i}")])
-    buttons.append([InlineKeyboardButton(text="🗑 Delete all", callback_data="delcard:all")])
+        buttons.append([InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")])
+    buttons.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -59,11 +82,7 @@ async def cmd_start(
     profile = await profile_repo.get(user_id)
 
     if profile:
-        await message.answer(
-            f"Welcome back! 👋\n"
-            f"Your level: {profile.level} | Goal: {profile.goal}\n\n"
-            "Type /session to start today's lesson."
-        )
+        await message.answer(welcome_back(profile.level, profile.goal))
     else:
         await dialog_manager.start(OnboardingSG.target_lang, mode=StartMode.RESET_STACK)
 
@@ -79,10 +98,10 @@ async def cmd_session(
     profile = await profile_repo.get(user_id)
 
     if not profile:
-        await message.answer("Please set up your profile first. Type /start")
+        await message.answer(no_profile())
         return
 
-    await message.answer("Preparing your lesson... ⏳")
+    await message.answer(preparing_lesson())
 
     # Get recent session topics to avoid repetition
     recent = await session_repo.get_recent(user_id, limit=3)
@@ -98,14 +117,10 @@ async def cmd_session(
             recent_topics=recent_topics,
         )
     except Exception as e:
-        await message.answer(f"Failed to prepare lesson: {e}\nPlease try again.")
+        await message.answer(lesson_failed(str(e)))
         return
 
-    # Store session context in FSM via a simple approach
-    # We'll use message state to track the session
     session_id = str(uuid.uuid4())[:8]
-
-    from html import escape
 
     article_msg = (
         f"📰 <b>{escape(title)}</b>\n\n"
@@ -120,8 +135,6 @@ async def cmd_session(
 
     await message.answer(article_msg, parse_mode="HTML")
 
-    # Store context for answer collection
-    # Using a simple module-level dict for hackathon speed
     _pending_sessions[user_id] = {
         "session_id": session_id,
         "title": title,
@@ -143,11 +156,11 @@ async def cmd_vocab(
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
     if not profile:
-        await message.answer("Please set up your profile first. Type /start")
+        await message.answer(no_profile())
         return
 
     recent = _vocab_topics.get(user_id, [])
-    await message.answer("Fetching vocabulary for you... ⏳")
+    await message.answer(fetching_vocab())
     try:
         topic_name, cards = await agent.topic_vocab_lesson(
             level=profile.level,
@@ -157,18 +170,18 @@ async def cmd_vocab(
             recent_topics=recent,
         )
     except Exception as e:
-        await message.answer(f"Failed to fetch vocabulary: {e}\nPlease try again.")
+        await message.answer(vocab_failed(str(e)))
         return
 
     if not cards:
-        await message.answer("Couldn't generate vocabulary this time. Try /vocab again.")
+        await message.answer(vocab_empty())
         return
 
     recent.append(topic_name)
     _vocab_topics[user_id] = recent[-5:]
 
     card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in cards)
-    response = f"🃏 <b>{escape(topic_name)} ({len(cards)} words):</b>\n\n{card_list}"
+    response = f"{vocab_header(topic_name, len(cards))}\n\n{card_list}"
     _last_cards[user_id] = cards
     await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
 
@@ -184,24 +197,7 @@ async def cmd_skip(
 
 @router.message(Command("help"))
 async def cmd_help(message: Message) -> None:
-    await message.answer(
-        "📚 <b>Language Tutor — Commands</b>\n\n"
-        "/session — Start today's lesson (article + 3 questions)\n"
-        "/vocab — Goal-aware vocabulary cards (8 words, topic rotates)\n"
-        "/skip — Same as /vocab\n"
-        "/settings — Update your profile (language, level, goal)\n"
-        "/help — Show this message\n\n"
-        "📖 How a session works:\n"
-        "1. Bot fetches an article in your target language\n"
-        "2. Answer 3 comprehension questions\n"
-        "3. Get honest feedback (no cards from reading)\n"
-        "4. Choose a writing exercise:\n"
-        "   ✍️ Sentences — 2–3 sentences with article words\n"
-        "   📝 Grammar — practice a grammar structure\n"
-        "   📰 Essay — 200+ word formal text (exam prep)\n"
-        "5. Writing feedback + flashcards from your mistakes\n\n"
-        "🃏 Cards can be deleted with the buttons below each card list."
-    )
+    await message.answer(help_text(), parse_mode="HTML")
 
 
 @router.message(Command("settings"))
@@ -235,7 +231,7 @@ async def handle_answer(
         if not profile:
             return
         recent = _vocab_topics.get(user_id, [])
-        await message.answer("Skipping reading... fetching vocabulary instead ⏳")
+        await message.answer(skipping_to_vocab())
         try:
             topic_name, cards = await agent.topic_vocab_lesson(
                 level=profile.level,
@@ -245,22 +241,22 @@ async def handle_answer(
                 recent_topics=recent,
             )
         except Exception:
-            await message.answer("Couldn't fetch vocabulary. Try /vocab again.")
+            await message.answer(vocab_fetch_failed())
             return
         if cards:
             recent.append(topic_name)
             _vocab_topics[user_id] = recent[-5:]
             card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in cards)
-            response = f"🃏 <b>{escape(topic_name)} ({len(cards)} words):</b>\n\n{card_list}"
+            response = f"{vocab_header(topic_name, len(cards))}\n\n{card_list}"
             _last_cards[user_id] = cards
             await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
         else:
-            await message.answer("No vocabulary found. Try /vocab again.")
+            await message.answer(vocab_not_found())
         return
 
     del _pending_sessions[user_id]
 
-    await message.answer("Reviewing your answers... 🤔")
+    await message.answer(reviewing_answers())
 
     # Use the full text as answers (simple: one message for all 3)
     answers = [message.text]
@@ -319,11 +315,11 @@ async def handle_writing_exercise_start(
     user_id = callback.from_user.id
     ctx = _pending_writing.get(user_id)
     if not ctx:
-        await callback.answer("Session expired. Start a new /session.")
+        await callback.answer(session_expired())
         return
     mode = callback.data.split(":", 1)[1]  # type: ignore  # "sentences" | "grammar" | "article"
     await callback.answer()
-    await callback.message.answer("Preparing your writing task... ✍️")  # type: ignore
+    await callback.message.answer(preparing_writing())  # type: ignore
     task = await agent.generate_writing_task(
         ctx["article_text"], ctx["target_lang"], ctx["level"], mode
     )
@@ -349,7 +345,7 @@ async def handle_writing(
     ctx = _pending_writing.pop(user_id, None)
     if not ctx or not message.text:
         return
-    await message.answer("Reviewing your writing... 🤔")
+    await message.answer(reviewing_writing())
     feedback, cards = await agent.review_writing(
         writing_task=ctx["task"],
         user_writing=message.text,
@@ -361,7 +357,7 @@ async def handle_writing(
     response = f"✍️ <b>Writing feedback:</b>\n\n{escape(feedback)}"
     if cards:
         card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in cards)
-        response += f"\n\n🃏 <b>Flashcards saved ({len(cards)}):</b>\n{card_list}"
+        response += f"\n\n{writing_cards_header(len(cards))}\n{card_list}"
         _last_cards[user_id] = cards
         await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
     else:
@@ -385,12 +381,12 @@ async def handle_delete_card(
                 await gateway.delete_card(card.backend_id)
         _last_cards.pop(user_id, None)
         await callback.message.edit_reply_markup(reply_markup=None)  # type: ignore
-        await callback.answer("All cards deleted.")
+        await callback.answer(all_cards_deleted())
         return
 
     idx = int(action)
     if idx >= len(cards):
-        await callback.answer("Card not found.")
+        await callback.answer(card_not_found())
         return
 
     card = cards[idx]
@@ -399,7 +395,7 @@ async def handle_delete_card(
 
     cards.pop(idx)
     _last_cards[user_id] = cards
-    await callback.answer(f"Deleted: {card.word}")
+    await callback.answer(card_deleted(card.word))
 
     if cards:
         await callback.message.edit_reply_markup(reply_markup=_cards_keyboard(cards))  # type: ignore

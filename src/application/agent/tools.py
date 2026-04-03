@@ -90,21 +90,17 @@ class AgentTools:
         return f"Unknown tool: {name}"
 
     async def _fetch_article(self, level: str, source_url: str | None = None) -> str:
-        logger.info("fetch_article: level=%s url=%s", level, source_url or "default")
         try:
             article = await self._fetcher.fetch(level, self._target_lang, source_url)
             self.fetched_article = article
-            logger.info("fetch_article: OK — '%s'", article.title)
             return f"Title: {article.title}\n\nText:\n{article.text}"
         except Exception as e:
-            logger.warning("fetch_article: FAILED from %s — %s", source_url or "default", e)
             return f"ERROR fetching from {source_url or 'default'}: {e}. Try the next source_url."
 
     async def _create_anki_card(self, args: dict) -> str:
         word = args["word"]
         key = word.lower().strip()
         if key in self._created_words:
-            logger.info("create_card: duplicate skipped — '%s'", word)
             return f"Skipped duplicate: {word}"
         card = VocabCard(
             word=word,
@@ -125,7 +121,5 @@ class AgentTools:
         )
         self.created_cards.append(card)
         if backend_id:
-            logger.info("create_card: OK — '%s' → '%s' (id=%s)", card.word, card.translation, backend_id)
             return f"Card created: {card.word} → {card.translation}"
-        logger.warning("create_card: backend unavailable — saved locally '%s'", card.word)
         return f"Card saved locally: {card.word} → {card.translation} (backend not connected)"

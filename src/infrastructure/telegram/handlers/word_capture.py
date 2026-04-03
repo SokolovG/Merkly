@@ -1,5 +1,4 @@
 import logging
-from html import escape
 
 from aiogram import Router
 from aiogram.types import Message
@@ -8,6 +7,15 @@ from dishka.integrations.aiogram import FromDishka
 from src.application.agent.core import LessonAgent
 from src.domain.exceptions import AppError, WordCaptureError
 from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
+from src.infrastructure.telegram.messages import (
+    card_saved,
+    card_saved_no_backend,
+    complete_setup,
+    looking_up,
+    word_capture_error,
+    word_capture_failed,
+    word_empty,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,17 +34,15 @@ async def handle_word_capture(
     word = (message.text or "")[1:].strip()
 
     if not word:
-        await message.reply("Please add a word after +, e.g. <b>+Brot</b>", parse_mode="HTML")
+        await message.reply(word_empty(), parse_mode="HTML")
         return
-
-    logger.info("User %d: +%s", user_id, word)
 
     profile = await profile_repo.get(user_id)
     if not profile:
-        await message.reply("Please complete setup first — type /start")
+        await message.reply(complete_setup())
         return
 
-    await message.reply("Looking up <b>" + escape(word) + "</b>... ⏳", parse_mode="HTML")
+    await message.reply(looking_up(word), parse_mode="HTML")
 
     try:
         card = await agent.capture_word(
@@ -44,30 +50,16 @@ async def handle_word_capture(
             target_lang=profile.target_lang,
             native_lang=profile.native_lang,
         )
-    except WordCaptureError as e:
-        logger.warning("capture_word failed for user %s word '%s': %s", user_id, word, e)
-        await message.reply(
-            f"Couldn't generate a card for <b>{escape(word)}</b>. "
-            "Try again or check the spelling.",
-            parse_mode="HTML",
-        )
+    except WordCaptureError:
+        await message.reply(word_capture_failed(word), parse_mode="HTML")
         return
-    except AppError as e:
-        logger.error("capture_word infra error for user %s: %s", user_id, e)
-        await message.reply(
-            "Something went wrong adding the card. Please try again.",
-            parse_mode="HTML",
-        )
+    except AppError:
+        await message.reply(word_capture_error(), parse_mode="HTML")
         return
 
     display_word = f"{card.article} {card.word}" if card.article else card.word
-    lines = [
-        f"✅ <b>{escape(display_word)}</b> — {escape(card.translation)}",
-        f"<i>{escape(card.example_sentence)}</i>",
-    ]
     if card.backend_id:
-        lines.append("📥 Saved to your deck")
+        text = card_saved(display_word, card.translation, card.example_sentence)
     else:
-        lines.append("⚠️ Card saved locally (deck not connected)")
-
-    await message.reply("\n".join(lines), parse_mode="HTML")
+        text = card_saved_no_backend(display_word, card.translation, card.example_sentence)
+    await message.reply(text, parse_mode="HTML")

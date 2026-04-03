@@ -48,10 +48,8 @@ class MochiClient:
             back_id = next((fid for fid in fields if fid != "name"), None)
             if back_id:
                 self._back_field_id = back_id
-                logger.info("Mochi: discovered back field id=%r template=%r", back_id, template_id)
             return self._back_field_id
-        except Exception as exc:
-            logger.warning("Mochi: could not discover back field: %s", exc)
+        except Exception:
             return None
 
     async def create_card(self, card: VocabCard) -> str | None:
@@ -72,7 +70,6 @@ class MochiClient:
             resp = await self._client.post("/cards/", json=payload)
             if resp.status_code in (200, 201):
                 card_id = resp.json().get("id")
-                logger.info("Mochi: card created word=%r id=%r", card.word, card_id)
                 return card_id
             raise CardBackendError(f"Mochi {resp.status_code}: {resp.text[:200]}")
         except CardBackendError:

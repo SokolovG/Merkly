@@ -21,19 +21,22 @@ T = TypeVar("T")
 def retry(
     max_attempts: int, backoff: float, max_backoff: float = 30.0
 ) -> Callable[[Callable[..., Coroutine[Any, Any, T]]], Callable[..., Coroutine[Any, Any, T]]]:
-    def decorator(func: Callable[..., Coroutine[Any, Any, T]]) -> Callable[..., Coroutine[Any, Any, T]]:
+    def decorator(
+        func: Callable[..., Coroutine[Any, Any, T]],
+    ) -> Callable[..., Coroutine[Any, Any, T]]:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             for attempt in range(max_attempts):
                 try:
                     return await func(*args, **kwargs)
-                except Exception as e:
+                except Exception:
                     if attempt == max_attempts - 1:
                         raise
-                    wait = min(backoff * (2 ** attempt), max_backoff)
-                    logger.warning("Attempt %d/%d failed: %s. Retrying in %.1fs...", attempt + 1, max_attempts, e, wait)
+                    wait = min(backoff * (2**attempt), max_backoff)
                     await asyncio.sleep(wait)
+
         return wrapper
+
     return decorator
 
 
@@ -64,7 +67,9 @@ class NewsArticleFetcher(IArticleFetcher):
         )
 
     @retry(max_attempts=3, backoff=1.0)
-    async def fetch(self, level: str, language: str = "de", source_url: str | None = None) -> Article:
+    async def fetch(
+        self, level: str, language: str = "de", source_url: str | None = None
+    ) -> Article:
         """Fetch from source_url if given, otherwise use a default for the language."""
         url = source_url or _DEFAULT_SOURCES.get(language, _DEFAULT_SOURCES["en"])[0]
         return await self._fetch_from_rss(url, level)
@@ -81,11 +86,7 @@ class NewsArticleFetcher(IArticleFetcher):
 
         # Handle both RSS 2.0 and RDF namespaced elements
         def find_text(el: ET.Element, tag: str) -> str:
-            return (
-                el.findtext(tag)
-                or el.findtext(f"{{http://purl.org/rss/1.0/}}{tag}")
-                or ""
-            )
+            return el.findtext(tag) or el.findtext(f"{{http://purl.org/rss/1.0/}}{tag}") or ""
 
         title = find_text(item, "title").strip() or "Article"
         link = find_text(item, "link").strip()
@@ -98,7 +99,6 @@ class NewsArticleFetcher(IArticleFetcher):
         if len(text.split()) < 20:
             raise FetcherError(f"Article text too short from {feed_url}")
 
-        logger.info("Fetched article: '%s' from %s", title, feed_url)
         return Article(url=link or feed_url, title=title, text=_truncate(text), level=level)
 
     async def _fetch_page_text(self, url: str) -> str | None:
@@ -109,7 +109,11 @@ class NewsArticleFetcher(IArticleFetcher):
             html = resp.text
 
             # Try JSON-LD articleBody first (clean, no JS noise)
-            for m in re.finditer(r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>', html, re.DOTALL | re.IGNORECASE):
+            for m in re.finditer(
+                r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+                html,
+                re.DOTALL | re.IGNORECASE,
+            ):
                 try:
                     data = json.loads(m.group(1))
                     body = data.get("articleBody") or data.get("description", "")
@@ -119,7 +123,12 @@ class NewsArticleFetcher(IArticleFetcher):
                     continue
 
             # Fallback: strip script/style blocks, then tags
-            html = re.sub(r"<(script|style)[^>]*>.*?</(script|style)>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+            html = re.sub(
+                r"<(script|style)[^>]*>.*?</(script|style)>",
+                " ",
+                html,
+                flags=re.DOTALL | re.IGNORECASE,
+            )
             text = re.sub(r"<[^>]+>", " ", html)
             return _truncate(re.sub(r"\s+", " ", text).strip())
         except Exception:
