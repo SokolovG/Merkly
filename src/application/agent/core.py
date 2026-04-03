@@ -219,6 +219,8 @@ class LessonAgent:
         native_lang: str,
         target_lang: str,
         recent_topics: list[str],
+        count: int = 8,
+        force_topic: str | None = None,
     ) -> tuple[str, list[VocabCard]]:
         """Generate goal-aware vocabulary cards for a chosen topic. Returns (topic_name, cards)."""
         tools = AgentTools(self._fetcher, self._anki, target_lang)
@@ -227,14 +229,20 @@ class LessonAgent:
             Message(
                 role="user",
                 content=build_topic_vocab_prompt(
-                    level, goal, target_lang, native_lang, recent_topics
+                    level,
+                    goal,
+                    target_lang,
+                    native_lang,
+                    recent_topics,
+                    count=count,
+                    force_topic=force_topic,
                 ),
             ),
         ]
-        topic_name = "Vocabulary"
+        topic_name = force_topic or "Vocabulary"
         for _ in range(self.MAX_ITERATIONS):
             response = await self._llm.complete(messages, tools=TOOL_SCHEMAS)
-            if response.content and response.content.startswith("Topic:"):
+            if not force_topic and response.content and response.content.startswith("Topic:"):
                 first_line = response.content.split("\n")[0]
                 topic_name = first_line.replace("Topic:", "").strip()
             if response.tool_calls:

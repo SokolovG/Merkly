@@ -29,6 +29,7 @@ async def save_profile_on_confirm(
         reminder_enabled=data.get("reminder_enabled", False),
         reminder_time=data.get("reminder_time", "11:00"),
         utc_offset=int(data.get("utc_offset", 1)),
+        vocab_card_count=int(data.get("vocab_card_count", 8)),
         created_at=datetime.now().isoformat(),
     )
     await profile_repo.save(profile)

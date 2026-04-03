@@ -89,7 +89,7 @@ async def on_reminder(callback: CallbackQuery, button: Any, manager: DialogManag
     if button.widget_id == "remind_yes":
         await manager.next()
     else:
-        await manager.switch_to(OnboardingSG.confirm)
+        await manager.switch_to(OnboardingSG.vocab_count)
 
 
 async def on_reminder_time(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
@@ -113,7 +113,28 @@ async def on_custom_reminder_time(
 async def on_utc(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     raw = button.widget_id[3:]  # strip "utc"
     manager.dialog_data["utc_offset"] = int(raw.replace("m", "-"))
+    await manager.switch_to(OnboardingSG.vocab_count)
+
+
+# ── vocab card count ────────────────────────────────────────────────────────────
+
+
+async def on_vocab_count(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
+    manager.dialog_data["vocab_card_count"] = int(button.widget_id.replace("vc_", ""))
     await manager.switch_to(OnboardingSG.confirm)
+
+
+async def on_vocab_count_text(
+    message: Message, widget: Any, manager: DialogManager, value: str
+) -> None:
+    try:
+        n = int(value.strip())
+        if n < 1 or n > 20:
+            raise ValueError
+        manager.dialog_data["vocab_card_count"] = n
+        await manager.switch_to(OnboardingSG.confirm)
+    except ValueError:
+        await message.answer("Please enter a number between 1 and 20, e.g. 8")
 
 
 # ── dialog ─────────────────────────────────────────────────────────────────────
@@ -238,13 +259,27 @@ onboarding_dialog = Dialog(
         state=OnboardingSG.utc_offset,
     ),
     Window(
+        Const(
+            "How many vocabulary cards per /vocab session?\n\n" "Pick one or type a number (1–20):"
+        ),
+        Row(
+            Button(Const("5"), id="vc_5", on_click=on_vocab_count),
+            Button(Const("8"), id="vc_8", on_click=on_vocab_count),
+            Button(Const("10"), id="vc_10", on_click=on_vocab_count),
+            Button(Const("12"), id="vc_12", on_click=on_vocab_count),
+        ),
+        TextInput(id="vocab_count_input", type_factory=str, on_success=on_vocab_count_text),
+        state=OnboardingSG.vocab_count,
+    ),
+    Window(
         Format(
             "All set! Here's your profile:\n\n"
             "🌍 Learning: {dialog_data[target_lang]}\n"
             "📊 Level: {dialog_data[level]}\n"
             "🎯 Goal: {dialog_data[goal]}\n"
             "🗣 Native language: {dialog_data[native_lang]}\n"
-            "⏱ Session: {dialog_data[session_minutes]} min\n\n"
+            "⏱ Session: {dialog_data[session_minutes]} min\n"
+            "🃏 Vocab cards: {dialog_data[vocab_card_count]}\n\n"
             "Tap below to save and start!"
         ),
         Button(Const("✅ Save Profile"), id="save", on_click=save_profile_on_confirm),

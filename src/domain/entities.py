@@ -14,6 +14,7 @@ class UserProfile(msgspec.Struct):
     reminder_enabled: bool = False
     reminder_time: str = "11:00"
     utc_offset: int = 0
+    vocab_card_count: int = 8
     created_at: str = ""
 
 

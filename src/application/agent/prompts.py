@@ -103,7 +103,7 @@ def build_vocab_prompt(level: str, target_lang: str, native_lang: str) -> str:
 Fetch a {name} news article suitable for level {level}.
 Then extract exactly 5 vocabulary words or phrases from the article that are useful for a {level} student.
 For each word, call create_anki_card with the word, its {native_name} translation, and an example sentence from the article.
-Focus on words that are at or slightly above {level} difficulty — not basic A1/A2 words.
+Focus on words that are at or slightly above {level} difficulty.
 Do not ask any questions. Just fetch the article and create the 5 cards.
 """.strip()
 
@@ -153,19 +153,15 @@ def build_topic_vocab_prompt(
     target_lang: str,
     native_lang: str,
     recent_topics: list[str],
+    count: int = 8,
+    force_topic: str | None = None,
 ) -> str:
     name = lang_name(target_lang)
     native_name = lang_name(native_lang)
-    topics = GOAL_TOPICS.get(goal, GOAL_TOPICS["general"])
-    avoid = ", ".join(recent_topics) if recent_topics else "none"
-    topic_list = ", ".join(f'"{t}"' for t in topics)
-    return (
-        f"You are generating vocabulary flashcards for a {name} learner.\n"
-        f"Level: {level}. Goal: {goal}. Native language: {native_name}.\n\n"
-        f"Available topics for this goal: {topic_list}\n"
-        f"Recently used topics (avoid these): {avoid}\n\n"
-        f"Pick ONE topic from the available list that has NOT been recently used.\n"
-        f"Generate exactly 8 high-frequency, useful {name} words or phrases for that topic.\n"
+
+    _card_str = "card" if count == 1 else "cards"
+
+    card_instructions = (
         f"For each word, call create_anki_card with:\n"
         f"  - word: the {name} word/phrase\n"
         f"  - translation: {native_name} translation\n"
@@ -176,7 +172,32 @@ def build_topic_vocab_prompt(
         f"simple verbs (gehen, haben, sein), very common words (Prüfung, Vorlesung, Arbeit, Büro). "
         f"If you're unsure whether a word is too basic — skip it and pick a more specific, less common word.\n"
         f"Prefer: multi-word phrases, collocations, formal register words, discipline-specific terms.\n"
-        f"Start your response with exactly: 'Topic: [chosen topic name]' then create the cards. No other text."
+    )
+
+    if force_topic:
+        return (
+            f"You are generating vocabulary flashcards for a {name} learner.\n"
+            f"Level: {level}. Goal: {goal}. Native language: {native_name}.\n\n"
+            f"Generate exactly {count} high-frequency, useful {name} words or phrases"
+            f" for the topic: '{force_topic}'.\n"
+            f"{card_instructions}"
+            f"Start your response with exactly: 'Topic: {force_topic}' then create the {_card_str}."
+            f" No other text."
+        )
+
+    topics = GOAL_TOPICS.get(goal, GOAL_TOPICS["general"])
+    avoid = ", ".join(recent_topics) if recent_topics else "none"
+    topic_list = ", ".join(f'"{t}"' for t in topics)
+    return (
+        f"You are generating vocabulary flashcards for a {name} learner.\n"
+        f"Level: {level}. Goal: {goal}. Native language: {native_name}.\n\n"
+        f"Available topics for this goal: {topic_list}\n"
+        f"Recently used topics (avoid these): {avoid}\n\n"
+        f"Pick ONE topic from the available list that has NOT been recently used.\n"
+        f"Generate exactly {count} high-frequency, useful {name} words or phrases for that topic.\n"
+        f"{card_instructions}"
+        f"Start your response with exactly: 'Topic: [chosen topic name]' then create the {_card_str}."
+        f" No other text."
     )
 
 

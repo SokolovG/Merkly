@@ -10,13 +10,14 @@ class OnboardingSG(StatesGroup):
     reminder = State()
     reminder_time = State()
     utc_offset = State()
+    vocab_count = State()
     confirm = State()
 
 
 class SessionSG(StatesGroup):
-    reading = State()       # user reads the article + questions
+    reading = State()  # user reads the article + questions
     answering_1 = State()
     answering_2 = State()
     answering_3 = State()
-    reviewing = State()     # agent is reviewing
+    reviewing = State()  # agent is reviewing
     done = State()

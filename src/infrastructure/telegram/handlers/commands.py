@@ -68,7 +68,8 @@ def _cards_keyboard(cards: list[VocabCard]) -> InlineKeyboardMarkup:
     for i, card in enumerate(cards):
         btn = InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")
         buttons.append([btn])
-    buttons.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
+    if len(cards) > 1:
+        buttons.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -161,6 +162,25 @@ async def cmd_vocab(
         await message.answer(no_profile())
         return
 
+    # Parse args: /vocab | /vocab 5 | /vocab university | /vocab university 5
+    # Strip command prefix including optional @botname (e.g. "/vocab@bot cooking 1" -> "cooking 1")
+    text = message.text or ""
+    cmd_end = text.find(" ")
+    args_str = text[cmd_end:].strip() if cmd_end != -1 else ""
+
+    force_topic: str | None = None
+    count: int = profile.vocab_card_count
+
+    if args_str:
+        parts = args_str.rsplit(maxsplit=1)
+        if len(parts) == 2 and parts[1].isdigit():
+            force_topic = parts[0].strip() or None
+            count = int(parts[1])
+        elif args_str.isdigit():
+            count = int(args_str)
+        else:
+            force_topic = args_str
+
     recent = _vocab_topics.get(user_id, [])
     await message.answer(fetching_vocab())
     try:
@@ -170,6 +190,8 @@ async def cmd_vocab(
             native_lang=profile.native_lang,
             target_lang=profile.target_lang,
             recent_topics=recent,
+            count=count,
+            force_topic=force_topic,
         )
     except Exception as e:
         await message.answer(vocab_failed(str(e)))
