@@ -281,11 +281,19 @@ def build_writing_review_prompt(
     )
 
 
-def build_word_capture_prompt(word: str, target_lang: str, native_lang: str) -> str:
+def build_word_capture_prompt(
+    word: str, target_lang: str, native_lang: str, context: str | None = None
+) -> str:
     name = lang_name(target_lang)
     native_name = lang_name(native_lang)
+    context_hint = (
+        f"\nContext hint from the user: '{context}'. Use this to pick the correct meaning or register."
+        if context
+        else ""
+    )
     return (
-        f"The student is learning {name} and wants to add '{word}' to their flashcard deck.\n\n"
+        f"The student is learning {name} and wants to add '{word}' to their flashcard deck."
+        f"{context_hint}\n\n"
         f"Respond with ONLY a JSON object (no markdown, no code fences, no extra text) with these fields:\n"
         f"  word: the {name} word exactly as given\n"
         f"  article: grammatical article if noun (e.g. der/die/das for German, el/la for Spanish) — null if not a noun\n"

@@ -66,7 +66,8 @@ def _cards_keyboard(cards: list[VocabCard]) -> InlineKeyboardMarkup:
     """Inline keyboard with a delete button per card + delete all."""
     buttons = []
     for i, card in enumerate(cards):
-        buttons.append([InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")])
+        btn = InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")
+        buttons.append([btn])
     buttons.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -126,7 +127,8 @@ async def cmd_session(
         f"📰 <b>{escape(title)}</b>\n\n"
         f"{escape(text[:1500])}\n\n"
         f"---\n"
-        f"Now answer these questions in {escape(lang_name(profile.target_lang))} (or your native language if stuck):\n\n"
+        f"Now answer these questions in {escape(lang_name(profile.target_lang))}"
+        " (or your native language if stuck):\n\n"
     )
     for i, q in enumerate(questions, 1):
         article_msg += f"<b>{i}.</b> {escape(q)}\n"

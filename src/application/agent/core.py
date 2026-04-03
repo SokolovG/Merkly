@@ -278,6 +278,7 @@ class LessonAgent:
         word: str,
         target_lang: str,
         native_lang: str,
+        context: str | None = None,
     ) -> VocabCard:
         """Capture a single word: call LLM to generate card data, create card in backend."""
         import json
@@ -290,7 +291,7 @@ class LessonAgent:
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(
                 role="user",
-                content=build_word_capture_prompt(word, target_lang, native_lang),
+                content=build_word_capture_prompt(word, target_lang, native_lang, context),
             ),
         ]
         try:

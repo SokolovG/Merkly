@@ -7,3 +7,4 @@ __pycache__/
 data/profiles/
 data/sessions/
 .paul
+.claude

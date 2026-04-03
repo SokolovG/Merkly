@@ -12,12 +12,14 @@ from src.infrastructure.telegram.states import OnboardingSG
 
 # ── target language (buttons only — fixed set) ────────────────────────────────
 
+
 async def on_target_lang(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["target_lang"] = button.widget_id
     await manager.next()
 
 
 # ── level ──────────────────────────────────────────────────────────────────────
+
 
 async def on_level(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["level"] = button.widget_id
@@ -31,6 +33,7 @@ async def on_level_text(message: Message, widget: Any, manager: DialogManager, v
 
 # ── goal ───────────────────────────────────────────────────────────────────────
 
+
 async def on_goal(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["goal"] = button.widget_id
     await manager.next()
@@ -42,6 +45,7 @@ async def on_goal_text(message: Message, widget: Any, manager: DialogManager, va
 
 
 # ── native language ────────────────────────────────────────────────────────────
+
 
 async def on_native_lang(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["native_lang"] = button.widget_id
@@ -57,6 +61,7 @@ async def on_native_lang_text(
 
 
 # ── session minutes ────────────────────────────────────────────────────────────
+
 
 async def on_minutes(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["session_minutes"] = int(button.widget_id.replace("min_", ""))
@@ -77,6 +82,7 @@ async def on_minutes_text(
 
 
 # ── reminder ───────────────────────────────────────────────────────────────────
+
 
 async def on_reminder(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["reminder_enabled"] = button.widget_id == "remind_yes"
@@ -161,7 +167,10 @@ onboarding_dialog = Dialog(
         state=OnboardingSG.goal,
     ),
     Window(
-        Const("What is your native language?\n\nPick one or type it (e.g. Turkish, Arabic, tr, ar):"),
+        Const(
+            "What is your native language?\n\n"
+            "Pick one or type it (e.g. Turkish, Arabic, tr, ar):"
+        ),
         Row(
             Button(Const("🇬🇧 English"), id="en", on_click=on_native_lang),
             Button(Const("🇷🇺 Russian"), id="ru", on_click=on_native_lang),

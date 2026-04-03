@@ -119,6 +119,20 @@ def word_capture_error() -> str:
     return "Something went wrong adding the card. Please try again."
 
 
+# --- Word capture: regenerate flow ---
+
+
+def ask_for_context() -> str:
+    return (
+        "Send context for the word "
+        "(e.g. <i>slang</i>, <i>food</i>, <i>Sprichwort</i>, <i>biology</i>)"
+    )
+
+
+def regenerating(word: str) -> str:
+    return f"Regenerating card for <b>{escape(word)}</b>... ⏳"
+
+
 # --- Cards keyboard labels ---
 
 

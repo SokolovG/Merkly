@@ -27,7 +27,10 @@ TOOL_SCHEMAS: list[dict] = [
                     },
                     "source_url": {
                         "type": "string",
-                        "description": "RSS feed URL to fetch from. Use the sources listed in your instructions.",
+                        "description": (
+                            "RSS feed URL to fetch from. "
+                            "Use the sources listed in your instructions."
+                        ),
                     },
                 },
                 "required": ["level"],
@@ -57,7 +60,10 @@ TOOL_SCHEMAS: list[dict] = [
                     },
                     "article": {
                         "type": "string",
-                        "description": "Grammatical article for nouns (language-dependent, e.g. der/die/das, el/la, le/la)",
+                        "description": (
+                            "Grammatical article for nouns "
+                            "(language-dependent, e.g. der/die/das, el/la, le/la)"
+                        ),
                     },
                 },
                 "required": ["word", "translation", "example_sentence", "word_type"],
