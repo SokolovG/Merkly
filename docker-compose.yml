@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     env_file: .env
     volumes:
+      - ./src:/app/src
       - ./data:/app/data
     extra_hosts:
       # Allows bot to reach AnkiConnect running on host machine

@@ -52,7 +52,7 @@ class MochiClient:
         except Exception:
             return None
 
-    async def create_card(self, card: VocabCard) -> str | None:
+    async def create_card(self, card: VocabCard, deck_id: str | None = None) -> str | None:
         front = self._build_front(card)
         back = self._build_back(card)
         back_field_id = await self._get_back_field_id()
@@ -62,7 +62,7 @@ class MochiClient:
             fields[back_field_id] = {"id": back_field_id, "value": back}
 
         payload = {
-            "deck-id": self._deck_id,
+            "deck-id": deck_id or self._deck_id,
             "content": f"## {front}\n---\n{back}",
             "fields": fields,
         }
@@ -76,6 +76,38 @@ class MochiClient:
             raise
         except Exception as exc:
             raise CardBackendError(f"Mochi request failed: {exc}") from exc
+
+    async def create_deck(self, name: str) -> str:
+        try:
+            resp = await self._client.post("/decks/", json={"name": name})
+            if resp.status_code not in (200, 201):
+                raise CardBackendError(f"Mochi create deck {resp.status_code}: {resp.text[:200]}")
+            deck_id = resp.json().get("id")
+            if not deck_id:
+                raise CardBackendError("Mochi create deck returned no id")
+            return deck_id
+        except CardBackendError:
+            raise
+        except Exception as exc:
+            raise CardBackendError(f"Mochi create deck failed: {exc}") from exc
+
+    async def list_decks(self) -> list[tuple[str, str]]:
+        try:
+            resp = await self._client.get("/decks/")
+            if resp.status_code != 200:
+                raise CardBackendError(f"Mochi list decks {resp.status_code}: {resp.text[:200]}")
+            docs = resp.json().get("docs", [])
+            seen: set[str] = set()
+            result = []
+            for d in docs:
+                if "id" in d and "name" in d and d["id"] not in seen and not d.get("trashed?"):
+                    seen.add(d["id"])
+                    result.append((d["name"], d["id"]))
+            return result
+        except CardBackendError:
+            raise
+        except Exception as exc:
+            raise CardBackendError(f"Mochi list decks failed: {exc}") from exc
 
     async def delete_card(self, card_id: str) -> bool:
         try:

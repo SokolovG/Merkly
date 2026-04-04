@@ -1,5 +1,7 @@
 from html import escape
 
+from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT
+
 # --- Onboarding / profile ---
 
 
@@ -156,25 +158,52 @@ def card_not_found() -> str:
     return "Card not found."
 
 
+# --- Deck management ---
+
+
+def deck_created(name: str) -> str:
+    return f"✅ Deck <b>{escape(name)}</b> created and set as active."
+
+
+def deck_selected(name: str) -> str:
+    return f"✅ Active deck set to <b>{escape(name)}</b>."
+
+
+def deck_no_decks() -> str:
+    return "No decks found. Create one with /newdeck &lt;name&gt;"
+
+
+def deck_pick_active() -> str:
+    return "Choose your active deck:"
+
+
+def deck_backend_error(detail: str) -> str:
+    return f"Card backend error: {escape(detail)}"
+
+
 # --- Help ---
 
 
-def help_text() -> str:
+def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
     return (
         "📚 <b>Language Tutor — Commands</b>\n\n"
-        "/session — Start today's lesson (article + 3 questions)\n"
-        "/vocab — Goal-aware vocabulary cards (8 words, topic rotates)\n"
+        "/session — Start today's lesson\n"
+        f"/vocab — Vocabulary cards ({vocab_card_count} words, topic rotates)\n"
         "/skip — Same as /vocab\n"
-        "/settings — Update your profile (language, level, goal)\n"
+        "/settings — Update your profile (language, level, goal, card count)\n"
+        "/newdeck &lt;name&gt; — Create a new deck in Anki/Mochi and set it as active\n"
+        "/setdeck — Pick your active deck from existing ones\n"
         "/help — Show this message\n\n"
         "📖 How a session works:\n"
         "1. Bot fetches an article in your target language\n"
         "2. Answer 3 comprehension questions\n"
-        "3. Get honest feedback (no cards from reading)\n"
-        "4. Choose a writing exercise:\n"
+        "3. Get honest feedback\n"
+        "4. Optional writing exercise:\n"
         "   ✍️ Sentences — 2–3 sentences with article words\n"
         "   📝 Grammar — practice a grammar structure\n"
         "   📰 Essay — 200+ word formal text (exam prep)\n"
         "5. Writing feedback + flashcards from your mistakes\n\n"
+        "🃏 Capture any word instantly: type <b>+word</b> (e.g. <b>+Brot</b>)\n"
+        "   Cards go to your active deck (/setdeck to change)\n\n"
         "🃏 Cards can be deleted with the buttons below each card list."
     )

@@ -221,8 +221,13 @@ async def cmd_skip(
 
 
 @router.message(Command("help"))
-async def cmd_help(message: Message) -> None:
-    await message.answer(help_text(), parse_mode="HTML")
+async def cmd_help(
+    message: Message,
+    profile_repo: FromDishka[JsonProfileRepository],
+) -> None:
+    profile = await profile_repo.get(message.from_user.id) if message.from_user else None
+    count = profile.vocab_card_count if profile else 8
+    await message.answer(help_text(count), parse_mode="HTML")
 
 
 @router.message(Command("settings"))

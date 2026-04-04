@@ -6,6 +6,7 @@ from aiogram_dialog import setup_dialogs
 
 from src.infrastructure.telegram.dialogs.onboarding import onboarding_dialog
 from src.infrastructure.telegram.handlers.commands import router as commands_router
+from src.infrastructure.telegram.handlers.deck_commands import deck_router
 from src.infrastructure.telegram.handlers.word_capture import word_router
 
 
@@ -19,12 +20,14 @@ class _Cmd:
 
 
 _COMMANDS = [
-    _Cmd("start",    "Start or restart the bot"),
-    _Cmd("session",  "Start today's language lesson"),
-    _Cmd("vocab",    "Goal-aware vocabulary cards (topic rotates)"),
-    _Cmd("skip",     "Alias for /vocab"),
+    _Cmd("start", "Start or restart the bot"),
+    _Cmd("session", "Start today's language lesson"),
+    _Cmd("vocab", "Goal-aware vocabulary cards (topic rotates)"),
+    _Cmd("skip", "Alias for /vocab"),
     _Cmd("settings", "Update your profile"),
-    _Cmd("help",     "Show available commands"),
+    _Cmd("newdeck", "Create a new deck in Anki/Mochi"),
+    _Cmd("setdeck", "Pick your active deck"),
+    _Cmd("help", "Show available commands"),
 ]
 
 
@@ -32,6 +35,7 @@ async def setup_bot(dp: Dispatcher, bot: Bot) -> None:
     """Register all routers, dialogs, and bot commands."""
     # Router order matters: word_router MUST be first (intercepts + before dialogs)
     dp.include_router(word_router)
+    dp.include_router(deck_router)
     dp.include_router(commands_router)
     dp.include_router(onboarding_dialog)
     setup_dialogs(dp)

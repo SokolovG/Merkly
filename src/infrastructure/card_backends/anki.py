@@ -21,7 +21,7 @@ class AnkiClient:
         except Exception:
             return False
 
-    async def create_card(self, card: VocabCard) -> str | None:
+    async def create_card(self, card: VocabCard, deck_id: str | None = None) -> str | None:
         front = self._build_front(card)
         back = self._build_back(card)
 
@@ -30,7 +30,7 @@ class AnkiClient:
             "version": 6,
             "params": {
                 "note": {
-                    "deckName": self._deck,
+                    "deckName": deck_id or self._deck,
                     "modelName": "Basic",
                     "fields": {"Front": front, "Back": back},
                     "options": {"allowDuplicate": False},
@@ -49,6 +49,37 @@ class AnkiClient:
             raise
         except Exception as exc:
             raise CardBackendError(f"Anki request failed: {exc}") from exc
+
+    async def create_deck(self, name: str) -> str:
+        payload = {
+            "action": "createDeck",
+            "version": 6,
+            "params": {"deck": name},
+        }
+        try:
+            resp = await self._client.post(self._url, json=payload)
+            result = resp.json()
+            if result.get("error"):
+                raise CardBackendError(f"Anki create deck error: {result['error']}")
+            return name  # Anki identifies decks by name
+        except CardBackendError:
+            raise
+        except Exception as exc:
+            raise CardBackendError(f"Anki create deck failed: {exc}") from exc
+
+    async def list_decks(self) -> list[tuple[str, str]]:
+        payload = {"action": "deckNames", "version": 6}
+        try:
+            resp = await self._client.post(self._url, json=payload)
+            result = resp.json()
+            if result.get("error"):
+                raise CardBackendError(f"Anki list decks error: {result['error']}")
+            deck_names: list[str] = result.get("result") or []
+            return [(name, name) for name in deck_names]
+        except CardBackendError:
+            raise
+        except Exception as exc:
+            raise CardBackendError(f"Anki list decks failed: {exc}") from exc
 
     async def delete_card(self, card_id: str) -> bool:
         payload = {

@@ -81,6 +81,7 @@ async def handle_word_capture(
             target_lang=profile.target_lang,
             native_lang=profile.native_lang,
             context=context,
+            deck_id=profile.active_deck_id or None,
         )
     except WordCaptureError:
         await message.reply(word_capture_failed(word), parse_mode="HTML")
@@ -94,6 +95,7 @@ async def handle_word_capture(
         "card": card,
         "target_lang": profile.target_lang,
         "native_lang": profile.native_lang,
+        "active_deck_id": profile.active_deck_id,
     }
 
     display_word = f"{card.article} {card.word}" if card.article else card.word
@@ -144,6 +146,7 @@ async def handle_regen_context(
             target_lang=ctx["target_lang"],
             native_lang=ctx["native_lang"],
             context=context,
+            deck_id=ctx.get("active_deck_id") or None,
         )
     except WordCaptureError:
         await message.reply(word_capture_failed(word), parse_mode="HTML")
@@ -157,6 +160,7 @@ async def handle_regen_context(
         "card": card,
         "target_lang": ctx["target_lang"],
         "native_lang": ctx["native_lang"],
+        "active_deck_id": ctx.get("active_deck_id"),
     }
 
     display_word = f"{card.article} {card.word}" if card.article else card.word

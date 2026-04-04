@@ -5,6 +5,11 @@ from src.domain.enums import Goal, Language, Level, WordType
 DEFAULT_VOCAB_CARD_COUNT = 8
 
 
+class UserDeck(msgspec.Struct):
+    name: str
+    backend_id: str  # For Anki: deck name (same as name). For Mochi: UUID returned by API.
+
+
 class UserProfile(msgspec.Struct):
     telegram_id: int
     username: str | None
@@ -18,6 +23,8 @@ class UserProfile(msgspec.Struct):
     utc_offset: int = 0
     vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT
     created_at: str = ""
+    decks: list[UserDeck] = []
+    active_deck_id: str = ""  # backend_id of active deck; empty = use env default
 
 
 class VocabCard(msgspec.Struct):

@@ -287,6 +287,7 @@ class LessonAgent:
         target_lang: str,
         native_lang: str,
         context: str | None = None,
+        deck_id: str | None = None,
     ) -> VocabCard:
         """Capture a single word: call LLM to generate card data, create card in backend."""
         import json
@@ -335,7 +336,7 @@ class LessonAgent:
         )
 
         try:
-            backend_id = await self._anki.create_card(card)
+            backend_id = await self._anki.create_card(card, deck_id=deck_id)
         except CardBackendError as e:
             raise WordCaptureError(f"Card backend failed for '{word}': {e}") from e
         return VocabCard(
