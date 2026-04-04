@@ -96,15 +96,16 @@ Start by fetching the article now.
 """.strip()
 
 
-def build_vocab_prompt(level: str, target_lang: str, native_lang: str) -> str:
+def build_vocab_prompt(level: str, target_lang: str, native_lang: str, count: int = 8) -> str:
     name = lang_name(target_lang)
     native_name = lang_name(native_lang)
+    _card_str = "card" if count == 1 else "cards"
     return f"""
 Fetch a {name} news article suitable for level {level}.
-Then extract exactly 5 vocabulary words or phrases from the article that are useful for a {level} student.
+Then extract exactly {count} vocabulary words or phrases from the article that are useful for a {level} student.
 For each word, call create_anki_card with the word, its {native_name} translation, and an example sentence from the article.
 Focus on words that are at or slightly above {level} difficulty.
-Do not ask any questions. Just fetch the article and create the 5 cards.
+Do not ask any questions. Just fetch the article and create the {count} {_card_str}.
 """.strip()
 
 

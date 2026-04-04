@@ -13,7 +13,7 @@ from src.application.agent.prompts import (
     lang_name,
 )
 from src.application.agent.tools import READING_TOOL_SCHEMAS, TOOL_SCHEMAS, AgentTools
-from src.domain.entities import VocabCard
+from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, VocabCard
 from src.domain.exceptions import WordCaptureError
 from src.domain.ports.article_fetcher import IArticleFetcher
 from src.domain.ports.card_gateway import ICardGateway
@@ -219,7 +219,7 @@ class LessonAgent:
         native_lang: str,
         target_lang: str,
         recent_topics: list[str],
-        count: int = 8,
+        count: int = DEFAULT_VOCAB_CARD_COUNT,
         force_topic: str | None = None,
     ) -> tuple[str, list[VocabCard]]:
         """Generate goal-aware vocabulary cards for a chosen topic. Returns (topic_name, cards)."""
@@ -254,7 +254,7 @@ class LessonAgent:
                 messages.append(Message(role="user", content="\n".join(tool_results)))
                 continue
             break
-        return topic_name, tools.created_cards
+        return topic_name, tools.created_cards[:count]
 
     async def vocab_only_lesson(
         self,

@@ -63,14 +63,15 @@ class _HasPendingWriting(BaseFilter):
 
 
 def _cards_keyboard(cards: list[VocabCard]) -> InlineKeyboardMarkup:
-    """Inline keyboard with a delete button per card + delete all."""
-    buttons = []
-    for i, card in enumerate(cards):
-        btn = InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")
-        buttons.append([btn])
+    """Inline keyboard with delete buttons (2 per row) + delete all."""
+    btns = [
+        InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")
+        for i, card in enumerate(cards)
+    ]
+    rows = [btns[i : i + 2] for i in range(0, len(btns), 2)]
     if len(cards) > 1:
-        buttons.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+        rows.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 @router.message(CommandStart())

@@ -2,6 +2,8 @@ import msgspec
 
 from src.domain.enums import Goal, Language, Level, WordType
 
+DEFAULT_VOCAB_CARD_COUNT = 8
+
 
 class UserProfile(msgspec.Struct):
     telegram_id: int
@@ -14,7 +16,7 @@ class UserProfile(msgspec.Struct):
     reminder_enabled: bool = False
     reminder_time: str = "11:00"
     utc_offset: int = 0
-    vocab_card_count: int = 8
+    vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT
     created_at: str = ""
 
 
