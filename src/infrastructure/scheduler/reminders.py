@@ -1,14 +1,23 @@
 from datetime import UTC, datetime, timedelta
+from html import escape
 
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
+from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
 from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
 
 _FLAG: dict[str, str] = {
-    "de": "🇩🇪", "en": "🇬🇧", "es": "🇪🇸", "fr": "🇫🇷", "it": "🇮🇹", "pt": "🇧🇷",
-    "ru": "🇷🇺", "ar": "🇸🇦", "zh": "🇨🇳",
+    "de": "🇩🇪",
+    "en": "🇬🇧",
+    "es": "🇪🇸",
+    "fr": "🇫🇷",
+    "it": "🇮🇹",
+    "pt": "🇧🇷",
+    "ru": "🇷🇺",
+    "ar": "🇸🇦",
+    "zh": "🇨🇳",
 }
 
 
@@ -36,12 +45,58 @@ async def send_reminders(bot: Bot, profile_repo: JsonProfileRepository) -> None:
             pass  # Don't crash the scheduler if one message fails
 
 
-def setup_scheduler(bot: Bot, profile_repo: JsonProfileRepository) -> AsyncIOScheduler:
+async def send_scheduled_vocab(
+    bot: Bot,
+    profile_repo: JsonProfileRepository,
+    agent: LessonAgent,
+) -> None:
+    profiles = await profile_repo.all()
+    now_utc = datetime.now(UTC)
+
+    for profile in profiles:
+        if not profile.vocab_scheduler_enabled:
+            continue
+        try:
+            user_time = now_utc + timedelta(hours=profile.utc_offset)
+            if user_time.strftime("%H:%M") != profile.vocab_scheduler_time:
+                continue
+            topic_name, cards = await agent.topic_vocab_lesson(
+                level=profile.level,
+                goal=profile.goal,
+                native_lang=profile.native_lang,
+                target_lang=profile.target_lang,
+                recent_topics=[],
+                count=profile.vocab_card_count,
+            )
+            if cards:
+                card_list = "\n".join(
+                    f"• <b>{escape(c.word)}</b> — {escape(c.translation)}" for c in cards
+                )
+                await bot.send_message(
+                    chat_id=profile.telegram_id,
+                    text=f"🃏 <b>Daily vocab: {escape(topic_name)}</b>\n\n{card_list}",
+                    parse_mode="HTML",
+                )
+        except Exception:
+            pass
+
+
+def setup_scheduler(
+    bot: Bot,
+    profile_repo: JsonProfileRepository,
+    agent: LessonAgent,
+) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
         send_reminders,
         trigger="cron",
-        minute="*",  # Check every minute, compare HH:MM inside
+        minute="*",
         kwargs={"bot": bot, "profile_repo": profile_repo},
+    )
+    scheduler.add_job(
+        send_scheduled_vocab,
+        trigger="cron",
+        minute="*",
+        kwargs={"bot": bot, "profile_repo": profile_repo, "agent": agent},
     )
     return scheduler

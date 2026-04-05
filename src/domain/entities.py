@@ -3,6 +3,8 @@ import msgspec
 from src.domain.enums import Goal, Language, Level, WordType
 
 DEFAULT_VOCAB_CARD_COUNT = 8
+DEFAULT_REMINDER_TIME = "11:00"
+DEFAULT_VOCAB_SCHEDULER_TIME = "09:00"
 
 
 class UserDeck(msgspec.Struct):
@@ -19,12 +21,15 @@ class UserProfile(msgspec.Struct):
     session_minutes: int
     target_lang: Language = Language.DE
     reminder_enabled: bool = False
-    reminder_time: str = "11:00"
+    reminder_time: str = DEFAULT_REMINDER_TIME
     utc_offset: int = 0
     vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT
     created_at: str = ""
     decks: list[UserDeck] = []
     active_deck_id: str = ""  # backend_id of active deck; empty = use env default
+    vocab_scheduler_enabled: bool = False
+    vocab_scheduler_time: str = DEFAULT_VOCAB_SCHEDULER_TIME  # HH:MM in user's local time
+    vocab_scheduler_deck_id: str = ""  # backend_id of target deck; empty = use active_deck_id
 
 
 class VocabCard(msgspec.Struct):

@@ -38,10 +38,10 @@ class CardBackend(Enum):
 
 logger = logging.getLogger(__name__)
 
+_MAX_AGENT_ITERATIONS = 10
+
 
 class LessonAgent:
-    MAX_ITERATIONS = 10
-
     def __init__(
         self,
         llm: ILLMGateway,
@@ -86,7 +86,7 @@ class LessonAgent:
             ),
         ]
 
-        for _ in range(self.MAX_ITERATIONS):
+        for _ in range(_MAX_AGENT_ITERATIONS):
             response = await self._llm.complete(messages, tools=TOOL_SCHEMAS)
 
             if response.tool_calls:
@@ -144,7 +144,7 @@ class LessonAgent:
 
         feedback_text = ""
 
-        for _ in range(self.MAX_ITERATIONS):
+        for _ in range(_MAX_AGENT_ITERATIONS):
             response = await self._llm.complete(messages, tools=READING_TOOL_SCHEMAS)
 
             if response.content:
@@ -195,7 +195,7 @@ class LessonAgent:
             ),
         ]
         feedback_text = ""
-        for _ in range(self.MAX_ITERATIONS):
+        for _ in range(_MAX_AGENT_ITERATIONS):
             response = await self._llm.complete(messages, tools=TOOL_SCHEMAS)
             if response.tool_calls:
                 tool_results = []
@@ -240,7 +240,7 @@ class LessonAgent:
             ),
         ]
         topic_name = force_topic or "Vocabulary"
-        for _ in range(self.MAX_ITERATIONS):
+        for _ in range(_MAX_AGENT_ITERATIONS):
             response = await self._llm.complete(messages, tools=TOOL_SCHEMAS)
             if not force_topic and response.content and response.content.startswith("Topic:"):
                 first_line = response.content.split("\n")[0]
@@ -268,7 +268,7 @@ class LessonAgent:
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(role="user", content=build_vocab_prompt(level, target_lang, native_lang)),
         ]
-        for _ in range(self.MAX_ITERATIONS):
+        for _ in range(_MAX_AGENT_ITERATIONS):
             response = await self._llm.complete(messages, tools=TOOL_SCHEMAS)
             if response.tool_calls:
                 tool_results = []

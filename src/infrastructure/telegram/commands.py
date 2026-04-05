@@ -7,6 +7,7 @@ from aiogram_dialog import setup_dialogs
 from src.infrastructure.telegram.dialogs.onboarding import onboarding_dialog
 from src.infrastructure.telegram.handlers.commands import router as commands_router
 from src.infrastructure.telegram.handlers.deck_commands import deck_router
+from src.infrastructure.telegram.handlers.scheduler_settings import scheduler_router
 from src.infrastructure.telegram.handlers.word_capture import word_router
 
 
@@ -27,6 +28,7 @@ _COMMANDS = [
     _Cmd("settings", "Update your profile"),
     _Cmd("newdeck", "Create a new deck in Anki/Mochi"),
     _Cmd("setdeck", "Pick your active deck"),
+    _Cmd("scheduler", "Daily vocab scheduler settings"),
     _Cmd("help", "Show available commands"),
 ]
 
@@ -36,6 +38,7 @@ async def setup_bot(dp: Dispatcher, bot: Bot) -> None:
     # Router order matters: word_router MUST be first (intercepts + before dialogs)
     dp.include_router(word_router)
     dp.include_router(deck_router)
+    dp.include_router(scheduler_router)
     dp.include_router(commands_router)
     dp.include_router(onboarding_dialog)
     setup_dialogs(dp)

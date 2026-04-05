@@ -25,6 +25,13 @@ class JsonProfileRepository:
         data = msgspec.json.encode(profile)
         await asyncio.to_thread(self._path(profile.telegram_id).write_bytes, data)
 
+    async def all(self) -> list[UserProfile]:
+        profiles = []
+        for path in self._dir.glob("*.json"):
+            data = await asyncio.to_thread(path.read_bytes)
+            profiles.append(msgspec.json.decode(data, type=UserProfile))
+        return profiles
+
     async def all_with_reminders(self) -> list[UserProfile]:
         profiles = []
         for path in self._dir.glob("*.json"):

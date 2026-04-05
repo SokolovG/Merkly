@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from dishka.integrations.aiogram import setup_dishka
 
+from src.application.agent.core import LessonAgent
 from src.config import Settings
 from src.container import create_container
 from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
@@ -30,7 +31,8 @@ async def main() -> None:
     await setup_bot(dp, bot)
 
     profile_repo = await container.get(JsonProfileRepository)
-    scheduler = setup_scheduler(bot, profile_repo)
+    agent = await container.get(LessonAgent)
+    scheduler = setup_scheduler(bot, profile_repo, agent)
     scheduler.start()
 
     logger.info("Bot started. Polling...")
