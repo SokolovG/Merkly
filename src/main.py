@@ -46,3 +46,10 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+# TODO: Add listening lessons(fetch podcats, cut it)
+# TODO: Add strategy for learning
+# TODO: Add tool for computer vision - after writing or text in TG or photo(fetch data from photo)
+# TODO: Maybe: Separate tg bot from backend, move it to frontend dir, make it just one of all front
+# ports(need to change models...)
+# TODO: Delete hardcode, make intefraces(for postgres, and more)

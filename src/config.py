@@ -35,3 +35,4 @@ class Settings(BaseSettings):
 
     # Storage
     data_dir: Path = Path("./data")
+    database_url: str = ""  # e.g. postgresql+asyncpg://user:pass@localhost/merkly
