@@ -29,12 +29,9 @@ from src.infrastructure.telegram.messages import (
     reviewing_answers,
     reviewing_writing,
     session_expired,
-    skipping_to_vocab,
     vocab_empty,
     vocab_failed,
-    vocab_fetch_failed,
     vocab_header,
-    vocab_not_found,
     welcome_back,
     writing_cards_header,
 )
@@ -173,14 +170,21 @@ async def cmd_vocab(
     count: int = profile.vocab_card_count
 
     if args_str:
-        parts = args_str.rsplit(maxsplit=1)
-        if len(parts) == 2 and parts[1].isdigit():
-            force_topic = parts[0].strip() or None
-            count = int(parts[1])
-        elif args_str.isdigit():
-            count = int(args_str)
+        parts = args_str.split(maxsplit=1)
+        if parts[0].isdigit():
+            # /vocab 5 [topic]
+            count = int(parts[0])
+            force_topic = parts[1].strip() if len(parts) == 2 else None
         else:
-            force_topic = args_str
+            # /vocab [topic] [count] or /vocab [topic]
+            rparts = args_str.rsplit(maxsplit=1)
+            if len(rparts) == 2 and rparts[1].isdigit():
+                force_topic = rparts[0].strip() or None
+                count = int(rparts[1])
+            elif args_str.isdigit():
+                count = int(args_str)
+            else:
+                force_topic = args_str
 
     recent = _vocab_topics.get(user_id, [])
     await message.answer(fetching_vocab())
@@ -211,15 +215,6 @@ async def cmd_vocab(
     await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
 
 
-@router.message(Command("skip", "pass"))
-async def cmd_skip(
-    message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
-    agent: FromDishka[LessonAgent],
-) -> None:
-    await cmd_vocab(message, profile_repo, agent)
-
-
 @router.message(Command("help"))
 async def cmd_help(
     message: Message,
@@ -228,17 +223,6 @@ async def cmd_help(
     profile = await profile_repo.get(message.from_user.id) if message.from_user else None
     count = profile.vocab_card_count if profile else 8
     await message.answer(help_text(count), parse_mode="HTML")
-
-
-@router.message(Command("settings"))
-async def cmd_settings(
-    message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
-    dialog_manager: DialogManager,
-) -> None:
-    # Clear any pending session so typed dialog inputs aren't treated as article answers
-    _pending_sessions.pop(message.from_user.id, None)  # type: ignore
-    await dialog_manager.start(OnboardingSG.target_lang, mode=StartMode.RESET_STACK)
 
 
 @router.message(_HasPendingSession())
@@ -252,36 +236,6 @@ async def handle_answer(
     ctx = _pending_sessions.get(user_id)
 
     if not ctx or not message.text:
-        return
-
-    # User wants to skip the reading — give vocab cards instead
-    if message.text.strip().lower() in ("/skip", "/pass"):
-        del _pending_sessions[user_id]
-        profile = await profile_repo.get(user_id)
-        if not profile:
-            return
-        recent = _vocab_topics.get(user_id, [])
-        await message.answer(skipping_to_vocab())
-        try:
-            topic_name, cards = await agent.topic_vocab_lesson(
-                level=profile.level,
-                goal=profile.goal,
-                native_lang=profile.native_lang,
-                target_lang=profile.target_lang,
-                recent_topics=recent,
-            )
-        except Exception:
-            await message.answer(vocab_fetch_failed())
-            return
-        if cards:
-            recent.append(topic_name)
-            _vocab_topics[user_id] = recent[-5:]
-            card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in cards)
-            response = f"{vocab_header(topic_name, len(cards))}\n\n{card_list}"
-            _last_cards[user_id] = cards
-            await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
-        else:
-            await message.answer(vocab_not_found())
         return
 
     del _pending_sessions[user_id]

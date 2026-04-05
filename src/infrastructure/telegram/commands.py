@@ -8,6 +8,7 @@ from src.infrastructure.telegram.dialogs.onboarding import onboarding_dialog
 from src.infrastructure.telegram.handlers.commands import router as commands_router
 from src.infrastructure.telegram.handlers.deck_commands import deck_router
 from src.infrastructure.telegram.handlers.scheduler_settings import scheduler_router
+from src.infrastructure.telegram.handlers.settings_menu import settings_router
 from src.infrastructure.telegram.handlers.word_capture import word_router
 
 
@@ -24,7 +25,6 @@ _COMMANDS = [
     _Cmd("start", "Start or restart the bot"),
     _Cmd("session", "Start today's language lesson"),
     _Cmd("vocab", "Goal-aware vocabulary cards (topic rotates)"),
-    _Cmd("skip", "Alias for /vocab"),
     _Cmd("settings", "Update your profile"),
     _Cmd("newdeck", "Create a new deck in Anki/Mochi"),
     _Cmd("setdeck", "Pick your active deck"),
@@ -39,6 +39,7 @@ async def setup_bot(dp: Dispatcher, bot: Bot) -> None:
     dp.include_router(word_router)
     dp.include_router(deck_router)
     dp.include_router(scheduler_router)
+    dp.include_router(settings_router)
     dp.include_router(commands_router)
     dp.include_router(onboarding_dialog)
     setup_dialogs(dp)

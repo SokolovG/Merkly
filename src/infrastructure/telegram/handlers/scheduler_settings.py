@@ -128,7 +128,7 @@ async def handle_time_input(
     if message.from_user is None or not message.text:
         return
     user_id = message.from_user.id
-    value = message.text.strip()
+    value = message.text.strip().replace(".", ":")
     if not re.match(r"^\d{1,2}:\d{2}$", value):
         await message.reply("Please use HH:MM format (e.g. <b>09:00</b>)", parse_mode="HTML")
         return

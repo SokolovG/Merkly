@@ -38,7 +38,7 @@ async def send_reminders(bot: Bot, profile_repo: JsonProfileRepository) -> None:
                     text=(
                         f"Hey! {flag}\n\n"
                         f"Time for your daily {name} practice.\n"
-                        "Type /session to start or /skip for quick vocabulary."
+                        "Type /session to start or /vocab for quick vocabulary."
                     ),
                 )
         except Exception:

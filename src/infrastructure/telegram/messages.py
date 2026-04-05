@@ -74,10 +74,6 @@ def vocab_header(topic: str, count: int) -> str:
     return f"🃏 <b>{escape(topic)} ({count} words):</b>"
 
 
-def skipping_to_vocab() -> str:
-    return "Skipping reading... fetching vocabulary instead ⏳"
-
-
 def vocab_fetch_failed() -> str:
     return "Couldn't fetch vocabulary. Try /vocab again."
 
@@ -189,8 +185,7 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "📚 <b>Language Tutor — Commands</b>\n\n"
         "/session — Start today's lesson\n"
         f"/vocab — Vocabulary cards ({vocab_card_count} words, topic rotates)\n"
-        "/skip — Same as /vocab\n"
-        "/settings — Update your profile (language, level, goal, card count)\n"
+"/settings — Update your profile (language, level, goal, card count)\n"
         "/newdeck &lt;name&gt; — Create a new deck in Anki/Mochi and set it as active\n"
         "/setdeck — Pick your active deck from existing ones\n"
         "/help — Show this message\n\n"
