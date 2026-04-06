@@ -8,6 +8,7 @@ from src.infrastructure.database.models.base import Base
 class SessionModel(Base):
     __tablename__ = "sessions"
 
+    session_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     user_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
     )
