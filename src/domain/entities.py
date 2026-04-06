@@ -1,6 +1,6 @@
 import msgspec
 
-from src.domain.enums import ActivityType, Goal, Language, Level, WordType
+from src.domain.enums import ActivityType, Goal, Language, WordType
 
 DEFAULT_VOCAB_CARD_COUNT = 8
 DEFAULT_REMINDER_TIME = "11:00"
@@ -15,7 +15,7 @@ class UserDeck(msgspec.Struct):
 class UserProfile(msgspec.Struct):
     telegram_id: int
     username: str | None
-    level: Level
+    level: str
     goal: Goal
     native_lang: Language
     session_minutes: int

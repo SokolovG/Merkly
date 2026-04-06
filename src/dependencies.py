@@ -24,7 +24,7 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     async def engine(self, settings: Settings) -> AsyncGenerator[AsyncEngine, None]:
-        engine = create_async_engine(settings.database_url, echo=False)
+        engine = create_async_engine(settings.async_database_url, echo=False)
         yield engine
         await engine.dispose()
 
@@ -54,9 +54,9 @@ class AppProvider(Provider):
     @provide(scope=Scope.APP, provides=LLMClient)
     def llm(self, settings: Settings) -> LLMClient:
         return LLMClient(
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key.get_secret_value(),
-            model=settings.llm_model,
+            base_url=settings.LLM_BASE_URL,
+            api_key=settings.LLM_API_KEY.get_secret_value(),
+            model=settings.LLM_MODEL,
         )
 
     @provide(scope=Scope.APP, provides=DWArticleFetcher)
@@ -65,7 +65,7 @@ class AppProvider(Provider):
 
     @provide(scope=Scope.APP)
     def card_gateway(self, settings: Settings) -> AnkiClient | MochiClient:
-        match CardBackend(settings.card_backend):
+        match CardBackend(settings.CARD_BACKEND):
             case CardBackend.ANKI:
                 return AnkiClient(settings.anki_connect_url, deck=settings.anki_deck)
             case CardBackend.MOCHI:

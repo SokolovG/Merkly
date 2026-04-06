@@ -11,6 +11,7 @@ from dishka.integrations.aiogram import FromDishka
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
 from src.domain.entities import Session, VocabCard
+from src.domain.enums import ActivityType
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
 from src.infrastructure.telegram.messages import (
@@ -28,6 +29,7 @@ from src.infrastructure.telegram.messages import (
     reviewing_answers,
     reviewing_writing,
     session_expired,
+    strategy_not_enabled,
     vocab_empty,
     vocab_failed,
     vocab_header,
@@ -100,6 +102,10 @@ async def cmd_session(
         await message.answer(no_profile())
         return
 
+    if ActivityType.READING not in profile.learning_strategy:
+        await message.answer(strategy_not_enabled("reading"))
+        return
+
     await message.answer(preparing_lesson())
 
     # Get recent session topics to avoid repetition
@@ -157,6 +163,10 @@ async def cmd_vocab(
     profile = await profile_repo.get(user_id)
     if not profile:
         await message.answer(no_profile())
+        return
+
+    if ActivityType.VOCAB not in profile.learning_strategy:
+        await message.answer(strategy_not_enabled("vocab"))
         return
 
     # Parse args: /vocab | /vocab 5 | /vocab university | /vocab university 5
@@ -253,26 +263,33 @@ async def handle_answer(
         target_lang=ctx["target_lang"],
     )
 
-    # Store context for optional writing exercise
-    _pending_writing[user_id] = {
-        "article_text": ctx["text"],
-        "target_lang": ctx["target_lang"],
-        "level": ctx["level"],
-        "native_lang": ctx["native_lang"],
-        "state": "offered",
-    }
-
-    writing_kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✍️ Sentences", callback_data="writing:sentences"),
-                InlineKeyboardButton(text="📝 Grammar", callback_data="writing:grammar"),
-                InlineKeyboardButton(text="📰 Essay text", callback_data="writing:article"),
-            ]
-        ]
-    )
     response = f"📝 <b>Feedback:</b>\n\n{escape(feedback)}"
-    await message.answer(response, parse_mode="HTML", reply_markup=writing_kb)
+
+    # Offer writing exercise only if WRITING is in the user's strategy
+    profile = await profile_repo.get(user_id)
+    writing_enabled = profile is None or ActivityType.WRITING in profile.learning_strategy
+
+    if writing_enabled:
+        # Store context for optional writing exercise
+        _pending_writing[user_id] = {
+            "article_text": ctx["text"],
+            "target_lang": ctx["target_lang"],
+            "level": ctx["level"],
+            "native_lang": ctx["native_lang"],
+            "state": "offered",
+        }
+        writing_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(text="✍️ Sentences", callback_data="writing:sentences"),
+                    InlineKeyboardButton(text="📝 Grammar", callback_data="writing:grammar"),
+                    InlineKeyboardButton(text="📰 Essay text", callback_data="writing:article"),
+                ]
+            ]
+        )
+        await message.answer(response, parse_mode="HTML", reply_markup=writing_kb)
+    else:
+        await message.answer(response, parse_mode="HTML")
 
     # Save session
     session = Session(

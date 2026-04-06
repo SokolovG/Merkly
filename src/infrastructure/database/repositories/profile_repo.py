@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import UserDeck, UserProfile
-from src.domain.enums import ActivityType, Goal, Language, Level
+from src.domain.enums import ActivityType, Goal, Language
 from src.infrastructure.database.models.profile_model import ProfileModel
 
 
@@ -16,7 +16,7 @@ class ProfileRepository:
         return UserProfile(
             telegram_id=row.telegram_id,
             username=row.username,
-            level=Level(row.level),
+            level=row.level,
             goal=Goal(row.goal),
             native_lang=Language(row.native_lang),
             session_minutes=row.session_minutes,

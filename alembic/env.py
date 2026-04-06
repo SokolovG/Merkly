@@ -12,8 +12,16 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Read DATABASE_URL from environment and override alembic.ini value
-config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
+database_url = os.environ.get(
+    "DATABASE_URL"
+) or "postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}".format(
+    user=os.environ["DB_USER"],
+    password=os.environ["DB_PASSWORD"],
+    host=os.environ["DB_HOST"],
+    port=os.environ["DB_PORT"],
+    name=os.environ["DB_NAME"],
+)
+config.set_main_option("sqlalchemy.url", database_url)
 
 target_metadata = Base.metadata
 

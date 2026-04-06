@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 async def main() -> None:
     settings = Settings()  # type: ignore
-    bot = Bot(token=settings.telegram_token.get_secret_value())  # noqa: S106
+    bot = Bot(token=settings.TELEGRAM_TOKEN.get_secret_value())  # noqa: S106
     dp = Dispatcher(storage=MemoryStorage())
 
     container = create_container()

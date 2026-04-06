@@ -177,6 +177,15 @@ def deck_backend_error(detail: str) -> str:
     return f"Card backend error: {escape(detail)}"
 
 
+# --- Strategy ---
+
+
+def strategy_not_enabled(activity: str) -> str:
+    return (
+        f"📋 {activity.capitalize()} is not in your active strategy.\n" "Enable it via /settings."
+    )
+
+
 # --- Help ---
 
 
