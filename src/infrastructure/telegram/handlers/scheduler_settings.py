@@ -7,8 +7,8 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
+from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.exceptions import CardBackendError
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
 from src.infrastructure.telegram.messages import complete_setup
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ def _update_profile(profile, **kwargs):
 @scheduler_router.message(F.text == "/scheduler")
 async def cmd_scheduler(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None:
         return
@@ -88,7 +88,7 @@ async def cmd_scheduler(
 @scheduler_router.callback_query(F.data == "sched:toggle")
 async def handle_toggle(
     callback: CallbackQuery,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     user_id = callback.from_user.id
     profile = await profile_repo.get(user_id)
@@ -123,7 +123,7 @@ async def handle_settime(callback: CallbackQuery) -> None:
 )
 async def handle_time_input(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None or not message.text:
         return
@@ -152,7 +152,7 @@ async def handle_time_input(
 async def handle_pickdeck(
     callback: CallbackQuery,
     card_gateway: FromDishka[AnkiClient | MochiClient],
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     user_id = callback.from_user.id
     profile = await profile_repo.get(user_id)
@@ -179,7 +179,7 @@ async def handle_pickdeck(
 @scheduler_router.callback_query(F.data.startswith("scheddeck:"))
 async def handle_deck_callback(
     callback: CallbackQuery,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     user_id = callback.from_user.id
     decks = _waiting_deck.get(user_id)

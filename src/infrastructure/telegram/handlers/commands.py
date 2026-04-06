@@ -12,8 +12,7 @@ from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
 from src.domain.entities import Session, VocabCard
 from src.domain.ports.card_gateway import ICardGateway
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
-from src.infrastructure.repositories.json_session_repo import JsonSessionRepository
+from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
 from src.infrastructure.telegram.messages import (
     all_cards_deleted,
     card_deleted,
@@ -75,7 +74,7 @@ def _cards_keyboard(cards: list[VocabCard]) -> InlineKeyboardMarkup:
 async def cmd_start(
     message: Message,
     dialog_manager: DialogManager,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
     _pending_sessions.pop(user_id, None)
@@ -90,8 +89,8 @@ async def cmd_start(
 @router.message(Command("session"))
 async def cmd_session(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
-    session_repo: FromDishka[JsonSessionRepository],
+    profile_repo: FromDishka[ProfileRepository],
+    session_repo: FromDishka[SessionRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
@@ -151,7 +150,7 @@ async def cmd_session(
 @router.message(Command("vocab"))
 async def cmd_vocab(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
@@ -218,7 +217,7 @@ async def cmd_vocab(
 @router.message(Command("help"))
 async def cmd_help(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     profile = await profile_repo.get(message.from_user.id) if message.from_user else None
     count = profile.vocab_card_count if profile else 8
@@ -228,8 +227,8 @@ async def cmd_help(
 @router.message(_HasPendingSession())
 async def handle_answer(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
-    session_repo: FromDishka[JsonSessionRepository],
+    profile_repo: FromDishka[ProfileRepository],
+    session_repo: FromDishka[SessionRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
     user_id = message.from_user.id  # type: ignore

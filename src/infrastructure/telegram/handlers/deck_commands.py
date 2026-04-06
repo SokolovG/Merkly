@@ -7,8 +7,8 @@ from dishka.integrations.aiogram import FromDishka
 from src.domain.entities import UserDeck
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
+from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.exceptions import CardBackendError
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
 from src.infrastructure.telegram.messages import (
     complete_setup,
     deck_backend_error,
@@ -45,7 +45,7 @@ async def _create_deck(
     message: Message,
     name: str,
     card_gateway: AnkiClient | MochiClient,
-    profile_repo: JsonProfileRepository,
+    profile_repo: ProfileRepository,
 ) -> None:
     if message.from_user is None:
         return
@@ -77,7 +77,7 @@ async def _create_deck(
 async def handle_newdeck(
     message: Message,
     card_gateway: FromDishka[AnkiClient | MochiClient],
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None:
         return
@@ -98,7 +98,7 @@ async def handle_newdeck(
 async def handle_newdeck_name(
     message: Message,
     card_gateway: FromDishka[AnkiClient | MochiClient],
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None or not message.text:
         return
@@ -112,7 +112,7 @@ async def handle_newdeck_name(
 async def handle_setdeck(
     message: Message,
     card_gateway: FromDishka[AnkiClient | MochiClient],
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None:
         return
@@ -142,7 +142,7 @@ async def handle_setdeck(
 @deck_router.callback_query(F.data.startswith("setdeck:"))
 async def handle_setdeck_callback(
     callback: CallbackQuery,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     user_id = callback.from_user.id
     decks = _pending_setdeck.get(user_id)

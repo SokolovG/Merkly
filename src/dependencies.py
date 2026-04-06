@@ -1,43 +1,57 @@
-from pathlib import Path
+from collections.abc import AsyncGenerator
 
 from dishka import Provider, Scope, make_async_container, provide
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from src.application.agent.core import CardBackend, LessonAgent
 from src.config import Settings
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
+from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
 from src.infrastructure.fetchers.german.dw import DWArticleFetcher
 from src.infrastructure.llm.client import LLMClient
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
-from src.infrastructure.repositories.json_session_repo import JsonSessionRepository
 
 
 class AppProvider(Provider):
-    scope = Scope.APP
-
-    @provide
+    @provide(scope=Scope.APP)
     def settings(self) -> Settings:
         return Settings()  # ty : ignore
 
-    @provide
-    def data_dir(self, settings: Settings) -> Path:
-        settings.data_dir.mkdir(parents=True, exist_ok=True)
-        return settings.data_dir
+    @provide(scope=Scope.APP)
+    async def engine(self, settings: Settings) -> AsyncGenerator[AsyncEngine, None]:
+        engine = create_async_engine(settings.database_url, echo=False)
+        yield engine
+        await engine.dispose()
 
-    # Concrete types as return values — dishka resolves by these keys.
-    # Handlers use FromDishka[JsonProfileRepository] etc., or we inject
-    # concrete types directly. Protocol-based injection requires provide()
-    # with explicit provides= parameter.
+    @provide(scope=Scope.APP)
+    def session_maker(self, engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+        return async_sessionmaker(engine, expire_on_commit=False)
 
-    @provide(provides=JsonProfileRepository)
-    def profile_repo(self, data_dir: Path) -> JsonProfileRepository:
-        return JsonProfileRepository(data_dir)
+    @provide(scope=Scope.REQUEST)
+    async def get_db_session(
+        self, session_maker: async_sessionmaker[AsyncSession]
+    ) -> AsyncGenerator[AsyncSession, None]:
+        async with session_maker() as session:
+            try:
+                yield session
+            except Exception:
+                await session.rollback()
+                raise
 
-    @provide(provides=JsonSessionRepository)
-    def session_repo(self, data_dir: Path) -> JsonSessionRepository:
-        return JsonSessionRepository(data_dir)
+    @provide(scope=Scope.REQUEST)
+    def profile_repo(self, session: AsyncSession) -> ProfileRepository:
+        return ProfileRepository(session)
 
-    @provide(provides=LLMClient)
+    @provide(scope=Scope.REQUEST)
+    def session_repo(self, session: AsyncSession) -> SessionRepository:
+        return SessionRepository(session)
+
+    @provide(scope=Scope.APP, provides=LLMClient)
     def llm(self, settings: Settings) -> LLMClient:
         return LLMClient(
             base_url=settings.llm_base_url,
@@ -45,11 +59,11 @@ class AppProvider(Provider):
             model=settings.llm_model,
         )
 
-    @provide(provides=DWArticleFetcher)
+    @provide(scope=Scope.APP, provides=DWArticleFetcher)
     def article_fetcher(self) -> DWArticleFetcher:
         return DWArticleFetcher()
 
-    @provide
+    @provide(scope=Scope.APP)
     def card_gateway(self, settings: Settings) -> AnkiClient | MochiClient:
         match CardBackend(settings.card_backend):
             case CardBackend.ANKI:
@@ -60,7 +74,7 @@ class AppProvider(Provider):
                     deck_id=settings.mochi_deck_id,
                 )
 
-    @provide
+    @provide(scope=Scope.APP)
     def agent(
         self,
         llm: LLMClient,

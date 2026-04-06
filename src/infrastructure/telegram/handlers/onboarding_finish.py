@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery
 from aiogram_dialog import DialogManager
 
 from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, UserProfile
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
+from src.infrastructure.database.repositories import ProfileRepository
 
 
 async def save_profile_on_confirm(
@@ -13,7 +13,7 @@ async def save_profile_on_confirm(
 ) -> None:
     """Button on_click handler for the confirm window. Saves UserProfile and closes dialog."""
     container = manager.middleware_data["dishka_container"]
-    profile_repo: JsonProfileRepository = await container.get(JsonProfileRepository)
+    profile_repo: ProfileRepository = await container.get(ProfileRepository)
 
     data = manager.dialog_data
     user = callback.from_user

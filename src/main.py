@@ -4,11 +4,11 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
 from dishka.integrations.aiogram import setup_dishka
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.application.agent.core import LessonAgent
 from src.config import Settings
-from src.container import create_container
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
+from src.dependencies import create_container
 from src.infrastructure.scheduler.reminders import setup_scheduler
 from src.infrastructure.telegram.commands import setup_bot
 
@@ -30,9 +30,9 @@ async def main() -> None:
 
     await setup_bot(dp, bot)
 
-    profile_repo = await container.get(JsonProfileRepository)
+    session_factory = await container.get(async_sessionmaker[AsyncSession])
     agent = await container.get(LessonAgent)
-    scheduler = setup_scheduler(bot, profile_repo, agent)
+    scheduler = setup_scheduler(bot, session_factory, agent)
     scheduler.start()
 
     logger.info("Bot started. Polling...")
@@ -47,9 +47,5 @@ async def main() -> None:
 if __name__ == "__main__":
     asyncio.run(main())
 
-# TODO: Add listening lessons(fetch podcats, cut it)
-# TODO: Add strategy for learning
-# TODO: Add tool for computer vision - after writing or text in TG or photo(fetch data from photo)
-# TODO: Maybe: Separate tg bot from backend, move it to frontend dir, make it just one of all front
-# ports(need to change models...)
-# TODO: Delete hardcode, make intefraces(for postgres, and more)
+
+# TODO: add buttons to settings, dekrete hardcode languages flaches

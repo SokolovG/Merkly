@@ -3,10 +3,11 @@ from html import escape
 
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
+from src.infrastructure.database.repositories import ProfileRepository
 
 _FLAG: dict[str, str] = {
     "de": "🇩🇪",
@@ -21,8 +22,11 @@ _FLAG: dict[str, str] = {
 }
 
 
-async def send_reminders(bot: Bot, profile_repo: JsonProfileRepository) -> None:
-    profiles = await profile_repo.all_with_reminders()
+async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
+    async with session_factory() as session:
+        profile_repo = ProfileRepository(session)
+        profiles = await profile_repo.all_with_reminders()
+
     now_utc = datetime.now(UTC)
 
     for profile in profiles:
@@ -47,10 +51,13 @@ async def send_reminders(bot: Bot, profile_repo: JsonProfileRepository) -> None:
 
 async def send_scheduled_vocab(
     bot: Bot,
-    profile_repo: JsonProfileRepository,
+    session_factory: async_sessionmaker,
     agent: LessonAgent,
 ) -> None:
-    profiles = await profile_repo.all()
+    async with session_factory() as session:
+        profile_repo = ProfileRepository(session)
+        profiles = await profile_repo.all()
+
     now_utc = datetime.now(UTC)
 
     for profile in profiles:
@@ -83,7 +90,7 @@ async def send_scheduled_vocab(
 
 def setup_scheduler(
     bot: Bot,
-    profile_repo: JsonProfileRepository,
+    session_factory: async_sessionmaker,
     agent: LessonAgent,
 ) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
@@ -91,12 +98,12 @@ def setup_scheduler(
         send_reminders,
         trigger="cron",
         minute="*",
-        kwargs={"bot": bot, "profile_repo": profile_repo},
+        kwargs={"bot": bot, "session_factory": session_factory},
     )
     scheduler.add_job(
         send_scheduled_vocab,
         trigger="cron",
         minute="*",
-        kwargs={"bot": bot, "profile_repo": profile_repo, "agent": agent},
+        kwargs={"bot": bot, "session_factory": session_factory, "agent": agent},
     )
     return scheduler

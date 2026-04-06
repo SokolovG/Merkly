@@ -9,7 +9,7 @@ from dishka.integrations.aiogram import FromDishka
 from src.application.agent.core import LessonAgent
 from src.domain.entities import VocabCard
 from src.domain.exceptions import AppError, WordCaptureError
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
+from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.telegram.messages import (
     ask_for_context,
     card_saved,
@@ -50,7 +50,7 @@ class _WaitingRegenContext(BaseFilter):
 async def handle_word_capture(
     message: Message,
     agent: FromDishka[LessonAgent],
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None:
         return

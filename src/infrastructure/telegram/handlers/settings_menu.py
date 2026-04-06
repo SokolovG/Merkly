@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from dishka.integrations.aiogram import FromDishka
 
 from src.domain.enums import Goal, Language, Level
-from src.infrastructure.repositories.json_profile_repo import JsonProfileRepository
+from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.telegram.messages import complete_setup
 
 logger = logging.getLogger(__name__)
@@ -109,12 +109,20 @@ def _update_profile(profile, **kwargs):
 
 _FIELD_PROMPTS: dict[str, str] = {
     "target_lang": "Language to learn — enter a code:\n<code>de  en  es  fr  it  pt</code>",
-    "level": "Your level — enter one:\n<code>A1  A2  B1  B2  C1</code>\nor custom (e.g. <code>B1+</code>)",
+    "level": (
+        "Your level — enter one:\n<code>A1  A2  B1  B2  C1</code>\n"
+        "or custom (e.g. <code>B1+</code>)"
+    ),
     "goal": "Your goal — enter one:\n<code>travel  work  conversation  general  study</code>",
-    "native_lang": "Native language — enter a code:\n<code>de  en  es  fr  it  pt  ru  uk</code>\nor a name (e.g. <code>Turkish</code>)",
+    "native_lang": (
+        "Native language — enter a code:\n<code>de  en  es  fr  it  pt  ru  uk</code>\n"
+        "or a name (e.g. <code>Turkish</code>)"
+    ),
     "session_minutes": "Session duration in minutes (5–180):",
     "reminder_time": "Reminder time — enter <b>HH:MM</b> (e.g. <b>09:00</b>):",
-    "utc_offset": "UTC offset — enter a number (e.g. <code>3</code>, <code>-5</code>, <code>0</code>):",
+    "utc_offset": (
+        "UTC offset — enter a number" " (e.g. <code>3</code>, <code>-5</code>, <code>0</code>):"
+    ),
     "vocab_scheduler_time": "Vocab scheduler time — enter <b>HH:MM</b> (e.g. <b>09:00</b>):",
     "vocab_card_count": "Vocab cards per session — enter a number (1–20):",
 }
@@ -180,7 +188,7 @@ def _parse_value(field: str, raw: str):
 @settings_router.message(Command("settings"))
 async def cmd_settings(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None:
         return
@@ -210,7 +218,7 @@ async def handle_edit_button(callback: CallbackQuery) -> None:
 @settings_router.callback_query(F.data.startswith("settoggle:"))
 async def handle_toggle(
     callback: CallbackQuery,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     field = (callback.data or "").split(":", 1)[1]
     user_id = callback.from_user.id
@@ -232,7 +240,7 @@ async def handle_toggle(
 @settings_router.message(lambda msg: msg.from_user is not None and msg.from_user.id in _editing)
 async def handle_field_input(
     message: Message,
-    profile_repo: FromDishka[JsonProfileRepository],
+    profile_repo: FromDishka[ProfileRepository],
 ) -> None:
     if message.from_user is None or not message.text:
         return
