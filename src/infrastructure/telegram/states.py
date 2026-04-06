@@ -11,6 +11,7 @@ class OnboardingSG(StatesGroup):
     reminder_time = State()
     utc_offset = State()
     vocab_count = State()
+    strategy = State()
     confirm = State()
 
 

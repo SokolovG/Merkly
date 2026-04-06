@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import UserDeck, UserProfile
-from src.domain.enums import Goal, Language, Level
+from src.domain.enums import ActivityType, Goal, Language, Level
 from src.infrastructure.database.models.profile_model import ProfileModel
 
 
@@ -31,6 +31,10 @@ class ProfileRepository:
             vocab_scheduler_enabled=row.vocab_scheduler_enabled,
             vocab_scheduler_time=row.vocab_scheduler_time,
             vocab_scheduler_deck_id=row.vocab_scheduler_deck_id,
+            learning_strategy=[
+                ActivityType(a)
+                for a in (row.learning_strategy or ["reading", "writing", "listening", "vocab"])
+            ],
         )
 
     def _to_values(self, profile: UserProfile) -> dict:
@@ -51,6 +55,7 @@ class ProfileRepository:
             "vocab_scheduler_enabled": profile.vocab_scheduler_enabled,
             "vocab_scheduler_time": profile.vocab_scheduler_time,
             "vocab_scheduler_deck_id": profile.vocab_scheduler_deck_id,
+            "learning_strategy": [str(a) for a in profile.learning_strategy],
         }
 
     async def get(self, telegram_id: int) -> UserProfile | None:

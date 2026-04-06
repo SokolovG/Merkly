@@ -49,3 +49,4 @@ if __name__ == "__main__":
 
 
 # TODO: add buttons to settings, dekrete hardcode languages flaches
+# TODO: add intruduction in start(help texts, explain logic of bot)

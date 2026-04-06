@@ -10,6 +10,8 @@ from aiogram_dialog.widgets.text import Const, Format
 from src.infrastructure.telegram.handlers.onboarding_finish import save_profile_on_confirm
 from src.infrastructure.telegram.states import OnboardingSG
 
+_ALL_ACTIVITIES = ["reading", "writing", "listening", "vocab"]
+
 # ── target language (buttons only — fixed set) ────────────────────────────────
 
 
@@ -121,7 +123,7 @@ async def on_utc(callback: CallbackQuery, button: Any, manager: DialogManager) -
 
 async def on_vocab_count(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
     manager.dialog_data["vocab_card_count"] = int(button.widget_id.replace("vc_", ""))
-    await manager.switch_to(OnboardingSG.confirm)
+    await manager.switch_to(OnboardingSG.strategy)
 
 
 async def on_vocab_count_text(
@@ -132,9 +134,40 @@ async def on_vocab_count_text(
         if n < 1 or n > 20:
             raise ValueError
         manager.dialog_data["vocab_card_count"] = n
-        await manager.switch_to(OnboardingSG.confirm)
+        await manager.switch_to(OnboardingSG.strategy)
     except ValueError:
         await message.answer("Please enter a number between 1 and 20, e.g. 8")
+
+
+# ── learning strategy ──────────────────────────────────────────────────────────
+
+
+async def _strategy_getter(dialog_manager: DialogManager, **kwargs: Any) -> dict[str, str]:
+    strategy: list[str] = dialog_manager.dialog_data.get("strategy", list(_ALL_ACTIVITIES))
+    return {
+        "label_reading": "📖 Reading ✅" if "reading" in strategy else "📖 Reading ☐",
+        "label_writing": "✍️ Writing ✅" if "writing" in strategy else "✍️ Writing ☐",
+        "label_listening": "🎧 Listening ✅" if "listening" in strategy else "🎧 Listening ☐",
+        "label_vocab": "📚 Vocab ✅" if "vocab" in strategy else "📚 Vocab ☐",
+    }
+
+
+async def on_strategy_toggle(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
+    activity = button.widget_id  # "reading", "writing", or "vocab"
+    strategy: list[str] = list(manager.dialog_data.get("strategy", list(_ALL_ACTIVITIES)))
+    if activity in strategy:
+        strategy.remove(activity)
+    else:
+        strategy.append(activity)
+    manager.dialog_data["strategy"] = strategy
+
+
+async def on_strategy_done(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
+    # Ensure at least one activity is selected; default to all if none
+    strategy = manager.dialog_data.get("strategy", list(_ALL_ACTIVITIES))
+    if not strategy:
+        manager.dialog_data["strategy"] = list(_ALL_ACTIVITIES)
+    await manager.switch_to(OnboardingSG.confirm)
 
 
 # ── dialog ─────────────────────────────────────────────────────────────────────
@@ -189,8 +222,7 @@ onboarding_dialog = Dialog(
     ),
     Window(
         Const(
-            "What is your native language?\n\n"
-            "Pick one or type it (e.g. Turkish, Arabic, tr, ar):"
+            "What is your native language?\n\nPick one or type it (e.g. Turkish, Arabic, tr, ar):"
         ),
         Row(
             Button(Const("🇬🇧 English"), id="en", on_click=on_native_lang),
@@ -259,9 +291,7 @@ onboarding_dialog = Dialog(
         state=OnboardingSG.utc_offset,
     ),
     Window(
-        Const(
-            "How many vocabulary cards per /vocab session?\n\n" "Pick one or type a number (1–20):"
-        ),
+        Const("How many vocabulary cards per /vocab session?\n\nPick one or type a number (1–20):"),
         Row(
             Button(Const("5"), id="vc_5", on_click=on_vocab_count),
             Button(Const("8"), id="vc_8", on_click=on_vocab_count),
@@ -270,6 +300,19 @@ onboarding_dialog = Dialog(
         ),
         TextInput(id="vocab_count_input", type_factory=str, on_success=on_vocab_count_text),
         state=OnboardingSG.vocab_count,
+    ),
+    Window(
+        Const(
+            "Which activities do you want in your daily practice?\n\n"
+            "Tap to toggle on/off, then tap Continue:"
+        ),
+        Row(Button(Format("{label_reading}"), id="reading", on_click=on_strategy_toggle)),
+        Row(Button(Format("{label_writing}"), id="writing", on_click=on_strategy_toggle)),
+        Row(Button(Format("{label_listening}"), id="listening", on_click=on_strategy_toggle)),
+        Row(Button(Format("{label_vocab}"), id="vocab", on_click=on_strategy_toggle)),
+        Row(Button(Const("Continue ➡️"), id="strategy_done", on_click=on_strategy_done)),
+        getter=_strategy_getter,
+        state=OnboardingSG.strategy,
     ),
     Window(
         Format(

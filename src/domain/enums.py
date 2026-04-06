@@ -33,3 +33,10 @@ class Language(StrEnum):
     PT = "pt"
     RU = "ru"
     UK = "uk"
+
+
+class ActivityType(StrEnum):
+    READING = "reading"
+    WRITING = "writing"
+    LISTENING = "listening"
+    VOCAB = "vocab"

@@ -26,3 +26,6 @@ class ProfileModel(Base):
     )
     vocab_scheduler_time: Mapped[str] = mapped_column(Text, nullable=False, server_default="09:00")
     vocab_scheduler_deck_id: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    learning_strategy: Mapped[list] = mapped_column(
+        JSONB, nullable=False, server_default='["reading","writing","listening","vocab"]'
+    )

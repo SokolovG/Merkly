@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 from aiogram_dialog import DialogManager
 
 from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, UserProfile
+from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
 
 
@@ -31,6 +32,10 @@ async def save_profile_on_confirm(
         utc_offset=int(data.get("utc_offset", 1)),
         vocab_card_count=int(data.get("vocab_card_count", DEFAULT_VOCAB_CARD_COUNT)),
         created_at=datetime.now().isoformat(),
+        learning_strategy=[
+            ActivityType(a)
+            for a in data.get("strategy", ["reading", "writing", "listening", "vocab"])
+        ],
     )
     await profile_repo.save(profile)
     await manager.done()
