@@ -1,8 +1,12 @@
+import logging
+
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 from src.infrastructure.exceptions import InfrastructureError
 from src.infrastructure.fetchers.podcast.constants import LANGUAGE_PODCAST_FETCHERS
 from src.infrastructure.fetchers.podcast.itunes import ItunesPodcastFetcher
 from src.infrastructure.fetchers.podcast.podcast_index import PodcastIndexFetcher
+
+logger = logging.getLogger(__name__)
 
 
 class PodcastFetcherRouter(IPodcastFetcher):
@@ -34,10 +38,16 @@ class PodcastFetcherRouter(IPodcastFetcher):
         )
 
     async def fetch(self, level: str, language: str) -> PodcastEpisode:
-        for fetcher in self._language_specific.get(language, []):
-            episode = await fetcher.fetch(level, language)
-            if episode:
-                return episode
+        lang_fetchers = self._language_specific.get(language, [])
+        if lang_fetchers:
+            # Language has dedicated fetchers — never fall back to generic (avoids wrong language)
+            for fetcher in lang_fetchers:
+                episode = await fetcher.fetch(level, language)
+                if episode:
+                    return episode
+                logger.warning("%s returned None for language=%s", type(fetcher).__name__, language)
+            raise InfrastructureError(f"All dedicated fetchers failed for language={language}")
+        # No dedicated fetchers — use generic sources
         for fetcher in self._generic:
             episode = await fetcher.fetch(level, language)
             if episode:

@@ -15,6 +15,7 @@ dependencies = [
     "asyncpg>=0.29",
     "alembic>=1.13",
     "psycopg2-binary>=2.9",
+    "feedparser>=6.0",
 ]
 
 [project.scripts]
@@ -41,5 +42,5 @@ ignore = ["B008"]
 [tool.ty.environment]
 python-version = "3.12"
 
-[tool.uv]
-dev-dependencies = ["ruff>=0.6", "ty>=0.0.1a6", "pre-commit>=3.8"]
+[dependency-groups]
+dev = ["ruff>=0.6", "ty>=0.0.1a6", "pre-commit>=3.8"]

@@ -22,5 +22,4 @@ class WhisperClient:
             )
         if response.status_code != 200:
             raise InfrastructureError(f"Whisper transcription failed: {response.text}")
-            logger.critical(response.json()["text"])
         return response.json()["text"]

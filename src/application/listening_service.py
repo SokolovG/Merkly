@@ -40,15 +40,11 @@ class ListeningAgent:
         Returns (audio_path, episode_title, questions, transcript).
         """
         episode = await self._fetcher.fetch(profile.level, profile.target_lang.value)
-        logger.critical(f"episode - {episode.audio_url}, {episode.title}")
         audio_path = await self._audio.download(episode.audio_url, profile.episode_duration_min)
-        logger.critical(audio_path)
         transcript = await self._whisper.transcribe(audio_path)
-        logger.critical(transcript)
         questions = await self._generate_questions(
             transcript, profile.level, profile.target_lang.value, profile.question_count
         )
-        logger.critical(questions)
         audio_lesson = AudioLesson(audio_path, episode.title, questions, transcript)
         return audio_lesson
 

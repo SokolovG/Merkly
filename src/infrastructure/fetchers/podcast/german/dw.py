@@ -1,43 +1,43 @@
-import xml.etree.ElementTree as ET
+import asyncio
+import logging
 
-import httpx
+import feedparser
 
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 
+logger = logging.getLogger(__name__)
+
 _DW_RSS_URL = "https://rss.dw.com/xml/podcast-de-langsam"
-_ITUNES_NS = "http://www.itunes.com/dtds/podcast-1.0.dtd"
 
 
 class DWPodcastFetcher(IPodcastFetcher):
     async def fetch(self, level: str, language: str) -> PodcastEpisode | None:
         try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.get(_DW_RSS_URL)
-                if response.status_code != 200:
-                    return None
-            root = ET.fromstring(response.text)
-            channel = root.find("channel")
-            if channel is None:
+            loop = asyncio.get_event_loop()
+            feed = await loop.run_in_executor(None, feedparser.parse, _DW_RSS_URL)
+            if not feed.entries:
+                logger.warning("DWPodcastFetcher: feed has no entries")
                 return None
-            item = channel.find("item")
-            if item is None:
-                return None
-            title = item.findtext("title", default="")
-            enclosure = item.find("enclosure")
-            audio_url = enclosure.get("url", "") if enclosure is not None else ""
-            duration_str = item.findtext(f"{{{_ITUNES_NS}}}duration", default="0")
-            # duration may be "HH:MM:SS", "MM:SS", or plain seconds
-            duration_seconds = _parse_duration(duration_str)
-            description = item.findtext("description", default="")
+            entry = feed.entries[0]
+            audio_url = next(
+                (
+                    e["href"]
+                    for e in entry.get("enclosures", [])
+                    if e.get("type", "").startswith("audio")
+                ),
+                "",
+            )
             if not audio_url:
+                logger.warning("DWPodcastFetcher: no audio enclosure in first entry")
                 return None
             return PodcastEpisode(
-                title=title,
+                title=entry.get("title", ""),
                 audio_url=audio_url,
-                duration_seconds=duration_seconds,
-                description=description,
+                duration_seconds=_parse_duration(entry.get("itunes_duration", "0")),
+                description=entry.get("summary", ""),
             )
-        except Exception:
+        except Exception as e:
+            logger.warning("DWPodcastFetcher failed: %s", e)
             return None
 
 

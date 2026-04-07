@@ -1,47 +1,49 @@
-import xml.etree.ElementTree as ET
+import asyncio
+import logging
 
-import httpx
+import feedparser
 
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 
+logger = logging.getLogger(__name__)
+
 _ORF_FEEDS = [
-    "https://sound.orf.at/podcast/oe1/oe1-wissen-aktuell/rss",
-    "https://sound.orf.at/podcast/oe1/oe1-digitalleben/rss",
+    "https://podcast.orf.at/podcast/oe1/oe1_wissen_aktuell/oe1_wissen_aktuell.xml",
+    "https://podcast.orf.at/podcast/oe1/oe1_digitalleben/oe1_digitalleben.xml",
+    "https://podcast.orf.at/podcast/oe1/oe1_journale/oe1_journale.xml",
 ]
-_ITUNES_NS = "http://www.itunes.com/dtds/podcast-1.0.dtd"
 
 
 class ORFPodcastFetcher(IPodcastFetcher):
     async def fetch(self, level: str, language: str) -> PodcastEpisode | None:
-        async with httpx.AsyncClient(timeout=15) as client:
-            for feed_url in _ORF_FEEDS:
-                try:
-                    response = await client.get(feed_url)
-                    if response.status_code != 200:
-                        continue
-                    root = ET.fromstring(response.text)
-                    channel = root.find("channel")
-                    if channel is None:
-                        continue
-                    item = channel.find("item")
-                    if item is None:
-                        continue
-                    title = item.findtext("title", default="")
-                    enclosure = item.find("enclosure")
-                    audio_url = enclosure.get("url", "") if enclosure is not None else ""
-                    if not audio_url:
-                        continue
-                    duration_str = item.findtext(f"{{{_ITUNES_NS}}}duration", default="0")
-                    duration_seconds = _parse_duration(duration_str)
-                    description = item.findtext("description", default="")
-                    return PodcastEpisode(
-                        title=title,
-                        audio_url=audio_url,
-                        duration_seconds=duration_seconds,
-                        description=description,
-                    )
-                except Exception:
+        loop = asyncio.get_event_loop()
+        for feed_url in _ORF_FEEDS:
+            try:
+                feed = await loop.run_in_executor(None, feedparser.parse, feed_url)
+                if not feed.entries:
+                    logger.warning("ORF feed %s: no entries", feed_url)
                     continue
+                entry = feed.entries[0]
+                audio_url = next(
+                    (
+                        e["href"]
+                        for e in entry.get("enclosures", [])
+                        if e.get("type", "").startswith("audio")
+                    ),
+                    "",
+                )
+                if not audio_url:
+                    logger.warning("ORF feed %s: no audio enclosure in first entry", feed_url)
+                    continue
+                return PodcastEpisode(
+                    title=entry.get("title", ""),
+                    audio_url=audio_url,
+                    duration_seconds=_parse_duration(entry.get("itunes_duration", "0")),
+                    description=entry.get("summary", ""),
+                )
+            except Exception as e:
+                logger.warning("ORF feed %s failed: %s", feed_url, e)
+                continue
         return None
 
 
