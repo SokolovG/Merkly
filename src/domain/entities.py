@@ -1,5 +1,6 @@
 import msgspec
 
+from src.domain.constants import DEFAULT_EPISODE_DURATION_MIN, DEFAULT_QUESTION_COUNT
 from src.domain.enums import ActivityType, Goal, Language, WordType
 
 DEFAULT_VOCAB_CARD_COUNT = 8
@@ -30,6 +31,8 @@ class UserProfile(msgspec.Struct):
     vocab_scheduler_enabled: bool = False
     vocab_scheduler_time: str = DEFAULT_VOCAB_SCHEDULER_TIME  # HH:MM in user's local time
     vocab_scheduler_deck_id: str = ""  # backend_id of target deck; empty = use active_deck_id
+    question_count: int = DEFAULT_QUESTION_COUNT  # Questions per session/listening/writing
+    episode_duration_min: int = DEFAULT_EPISODE_DURATION_MIN  # Preferred podcast clip length
     learning_strategy: list[ActivityType] = msgspec.field(
         default_factory=lambda: [
             ActivityType.READING,

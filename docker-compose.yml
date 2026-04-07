@@ -14,6 +14,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+  whisper:
+    build:
+      context: .
+      dockerfile: Dockerfile.whisper
+    restart: unless-stopped
+    environment:
+      - WHISPER__MODEL=base
+      - WHISPER__INFERENCE_DEVICE=cpu
+    ports:
+      - "8001:8000"
+    volumes:
+      - whisper-models:/root/.cache/huggingface
+
   backend:
     build: .
     restart: unless-stopped
@@ -21,6 +34,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      whisper:
+        condition: service_started
     volumes:
       - ./src:/app/src
       - ./data:/app/data
@@ -30,3 +45,4 @@ services:
 
 volumes:
   postgres_data:
+  whisper-models:

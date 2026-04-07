@@ -151,3 +151,7 @@ LANGUAGE_NAMES: dict[str, str] = {
     "zh": "Chinese",
     "zu": "Zulu",
 }
+
+DEFAULT_QUESTION_COUNT: int = 3
+DEFAULT_EPISODE_DURATION_MIN: int = 3
+EPISODE_DURATION_OPTIONS: list[int] = [3, 5, 7, 10]

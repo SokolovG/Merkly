@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     MOCHI_DECK_ID: str = ""
     MOCHI_BASE_URL: str = "https://app.mochi.cards/api"
 
+    # Podcast / Listening
+    PODCAST_INDEX_API_KEY: str = ""
+    PODCAST_INDEX_API_SECRET: str = ""
+    WHISPER_BASE_URL: str = "http://whisper:8000"
+
     # Database
     DB_HOST: str
     DB_PORT: int

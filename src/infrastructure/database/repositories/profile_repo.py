@@ -36,6 +36,8 @@ class ProfileRepository(IProfileRepository):
                 ActivityType(a)
                 for a in (row.learning_strategy or ["reading", "writing", "listening", "vocab"])
             ],
+            question_count=row.question_count,
+            episode_duration_min=row.episode_duration_min,
         )
 
     def _to_values(self, profile: UserProfile) -> dict:
@@ -57,6 +59,8 @@ class ProfileRepository(IProfileRepository):
             "vocab_scheduler_time": profile.vocab_scheduler_time,
             "vocab_scheduler_deck_id": profile.vocab_scheduler_deck_id,
             "learning_strategy": [str(a) for a in profile.learning_strategy],
+            "question_count": profile.question_count,
+            "episode_duration_min": profile.episode_duration_min,
         }
 
     async def get(self, telegram_id: int) -> UserProfile | None:

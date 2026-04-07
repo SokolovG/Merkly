@@ -29,3 +29,5 @@ class ProfileModel(Base):
     learning_strategy: Mapped[list] = mapped_column(
         JSONB, nullable=False, server_default='["reading","writing","listening","vocab"]'
     )
+    question_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="3")
+    episode_duration_min: Mapped[int] = mapped_column(Integer, nullable=False, server_default="3")
