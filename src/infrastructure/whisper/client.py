@@ -1,12 +1,16 @@
+from logging import getLogger
+
 import httpx
 
 from src.infrastructure.exceptions import InfrastructureError
+
+logger = getLogger(__name__)
 
 
 class WhisperClient:
     def __init__(self, base_url: str) -> None:
         self._base_url = base_url
-        self._client = httpx.AsyncClient(timeout=120)
+        self._client = httpx.AsyncClient(timeout=1200)
 
     async def transcribe(self, audio_path: str) -> str:
         """Send audio file to faster-whisper server, return transcript text."""
@@ -18,4 +22,5 @@ class WhisperClient:
             )
         if response.status_code != 200:
             raise InfrastructureError(f"Whisper transcription failed: {response.text}")
+            logger.critical(response.json()["text"])
         return response.json()["text"]

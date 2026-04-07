@@ -1,4 +1,5 @@
 from html import escape
+from logging import getLogger
 
 from aiogram import Router
 from aiogram.filters import Command
@@ -10,6 +11,8 @@ from src.application.listening_service import ListeningService
 from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.telegram import messages
+
+logger = getLogger(__name__)
 
 router = Router()
 
@@ -36,30 +39,29 @@ async def cmd_listen(
     await message.answer(messages.listening_fetching())
 
     try:
-        audio_path, episode_title, questions, transcript = await listening_service.prepare_lesson(
-            profile
-        )
+        lesson = await listening_service.prepare_lesson(profile)
     except Exception as e:
+        logger.error(e)
         await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
         return
 
-    with open(audio_path, "rb") as f:
+    with open(lesson.audio_path, "rb") as f:
         await message.answer_audio(
             BufferedInputFile(f.read(), filename="lesson.mp3"),
-            caption=f"🎧 {escape(episode_title)}",
+            caption=f"🎧 {escape(lesson.title)}",
         )
 
     await message.answer(messages.listening_transcribing())
 
     _pending_listening[user_id] = {
-        "transcript": transcript,
-        "questions": questions,
+        "transcript": lesson.transcript,
+        "questions": lesson.questions,
         "level": profile.level,
         "native_lang": profile.native_lang,
         "target_lang": profile.target_lang,
     }
 
-    questions_text = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
+    questions_text = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(lesson.questions))
     await message.answer(messages.listening_questions(questions_text))
 
 

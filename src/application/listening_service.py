@@ -1,4 +1,6 @@
 import re
+from dataclasses import dataclass
+from logging import getLogger
 
 from src.application.agent.prompts import build_system_prompt, lang_name
 from src.domain.entities import UserProfile
@@ -7,6 +9,16 @@ from src.infrastructure.audio import AudioService
 from src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter
 from src.infrastructure.llm.client import LLMClient
 from src.infrastructure.whisper.client import WhisperClient
+
+logger = getLogger(__name__)
+
+
+@dataclass
+class AudioLesson:
+    audio_path: str
+    title: str
+    questions: list[str]
+    transcript: str
 
 
 class ListeningService:
@@ -22,20 +34,23 @@ class ListeningService:
         self._whisper = whisper
         self._llm = llm
 
-    async def prepare_lesson(self, profile: UserProfile) -> tuple[str, str, list[str], str]:
+    async def prepare_lesson(self, profile: UserProfile) -> AudioLesson:
         """Fetch podcast, download+trim, transcribe, generate questions.
 
         Returns (audio_path, episode_title, questions, transcript).
         """
         episode = await self._fetcher.fetch(profile.level, profile.target_lang.value)
-        audio_path = await self._audio.download_and_trim(
-            episode.audio_url, profile.episode_duration_min
-        )
+        logger.critical(f"episode - {episode.audio_url}, {episode.title}")
+        audio_path = await self._audio.download(episode.audio_url)
+        logger.critical(audio_path)
         transcript = await self._whisper.transcribe(audio_path)
+        logger.critical(transcript)
         questions = await self._generate_questions(
             transcript, profile.level, profile.target_lang.value, profile.question_count
         )
-        return audio_path, episode.title, questions, transcript
+        logger.critical(questions)
+        audio_lesson = AudioLesson(audio_path, episode.title, questions, transcript)
+        return audio_lesson
 
     async def _generate_questions(
         self,
