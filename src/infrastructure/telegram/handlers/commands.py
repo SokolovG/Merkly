@@ -125,6 +125,7 @@ async def cmd_session(
             target_lang=profile.target_lang,
             session_minutes=profile.session_minutes,
             recent_topics=recent_topics,
+            question_count=profile.question_count,
         )
     except Exception as e:
         await message.answer(lesson_failed(str(e)))
@@ -142,7 +143,7 @@ async def cmd_session(
     for i, q in enumerate(questions, 1):
         article_msg += f"<b>{i}.</b> {escape(q)}\n"
 
-    article_msg += "\nSend your answers as one message (answer all 3)."
+    article_msg += f"\nSend your answers as one message (answer all {len(questions)})."
 
     await message.answer(article_msg, parse_mode="HTML")
 

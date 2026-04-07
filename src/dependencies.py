@@ -9,12 +9,16 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.application.agent.core import CardBackend, LessonAgent
+from src.application.listening_service import ListeningService
 from src.config import Settings
+from src.infrastructure.audio import AudioService
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
+from src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter
 from src.infrastructure.fetchers.rss import NewsArticleFetcher
 from src.infrastructure.llm.client import LLMClient
+from src.infrastructure.whisper.client import WhisperClient
 
 
 class AppProvider(Provider):
@@ -83,6 +87,35 @@ class AppProvider(Provider):
         card_gateway: AnkiClient | MochiClient,
     ) -> LessonAgent:
         return LessonAgent(llm=llm, fetcher=fetcher, anki=card_gateway)
+
+    # ── Podcast / Listening ───────────────────────────────────────────────────
+
+    @provide(scope=Scope.APP)
+    def podcast_fetcher(self, settings: Settings) -> PodcastFetcherRouter:
+        return PodcastFetcherRouter.build(
+            podcast_index_api_key=settings.PODCAST_INDEX_API_KEY,
+            podcast_index_api_secret=settings.PODCAST_INDEX_API_SECRET,
+        )
+
+    # ── Audio / Listening ─────────────────────────────────────────────────────
+
+    @provide(scope=Scope.APP)
+    def audio_service(self) -> AudioService:
+        return AudioService()
+
+    @provide(scope=Scope.APP)
+    def whisper_client(self, settings: Settings) -> WhisperClient:
+        return WhisperClient(base_url=settings.WHISPER_BASE_URL)
+
+    @provide(scope=Scope.APP)
+    def listening_service(
+        self,
+        podcast_fetcher: PodcastFetcherRouter,
+        audio: AudioService,
+        whisper: WhisperClient,
+        llm: LLMClient,
+    ) -> ListeningService:
+        return ListeningService(podcast_fetcher, audio, whisper, llm)
 
 
 def create_container():

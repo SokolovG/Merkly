@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka
 
-from src.domain.constants import LANGUAGE_FLAGS
+from src.domain.constants import EPISODE_DURATION_OPTIONS, LANGUAGE_FLAGS
 from src.domain.enums import ActivityType, Goal, Language, Level
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.telegram.messages import complete_setup
@@ -36,6 +36,8 @@ _FIELD_SUBMENU = {
     "utc_offset": "schedule",
     "vocab_scheduler_time": "schedule",
     "vocab_card_count": "main",
+    "question_count": "main",
+    "episode_duration_min": "main",
 }
 
 # Which submenu to return to after toggling
@@ -66,7 +68,8 @@ def _main_text(profile) -> str:
         f"<b>Level</b>      {profile.level}\n"
         f"<b>Goal</b>       {profile.goal}\n"
         f"<b>Native</b>     {_lang_label(profile.native_lang)}\n\n"
-        f"<b>Session</b>    {profile.session_minutes} min  ·  {profile.vocab_card_count} cards\n"
+        f"<b>Session</b>    {profile.session_minutes} min  ·  {profile.vocab_card_count} cards  ·  {profile.question_count} questions\n"
+        f"<b>Listening</b>  {profile.episode_duration_min} min clip\n"
         f"<b>Reminder</b>   {reminder_str}\n\n"
         f"<b>Strategy</b>\n{strategy_parts}"
     )
@@ -110,6 +113,20 @@ def _strategy_text(profile) -> str:
 
 
 def _main_keyboard(profile) -> InlineKeyboardMarkup:
+    duration_options = [
+        InlineKeyboardButton(
+            text=f"{'✅ ' if profile.episode_duration_min == n else ''}{n} min",
+            callback_data=f"setpick:episode_duration_min:{n}",
+        )
+        for n in EPISODE_DURATION_OPTIONS
+    ]
+    question_options = [
+        InlineKeyboardButton(
+            text=f"{'✅ ' if profile.question_count == n else ''}{n}Q",
+            callback_data=f"setpick:question_count:{n}",
+        )
+        for n in (2, 3, 5)
+    ]
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="👤 Profile", callback_data="settings:profile")],
@@ -129,6 +146,8 @@ def _main_keyboard(profile) -> InlineKeyboardMarkup:
                     callback_data="set:vocab_card_count",
                 ),
             ],
+            question_options,
+            duration_options,
         ]
     )
 
@@ -337,6 +356,36 @@ async def handle_edit_button(callback: CallbackQuery) -> None:
     await callback.answer()
     if isinstance(callback.message, Message):
         await callback.message.reply(_FIELD_PROMPTS[field], parse_mode="HTML")
+
+
+@settings_router.callback_query(F.data.startswith("setpick:"))
+async def handle_pick(
+    callback: CallbackQuery,
+    profile_repo: FromDishka[ProfileRepository],
+) -> None:
+    # setpick:{field}:{value}
+    parts = (callback.data or "").split(":", 2)
+    if len(parts) != 3:
+        await callback.answer("Invalid.")
+        return
+    _, field, raw_value = parts
+    user_id = callback.from_user.id
+    profile = await profile_repo.get(user_id)
+    if not profile:
+        await callback.answer("Profile not found.")
+        return
+    try:
+        value = int(raw_value)
+    except ValueError:
+        await callback.answer("Invalid value.")
+        return
+    updated = _update_profile(profile, **{field: value})
+    await profile_repo.save(updated)
+    await callback.answer(f"✅ Set to {value}")
+    if isinstance(callback.message, Message):
+        await callback.message.edit_text(
+            _main_text(updated), parse_mode="HTML", reply_markup=_main_keyboard(updated)
+        )
 
 
 @settings_router.callback_query(F.data.startswith("settoggle:"))

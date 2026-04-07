@@ -13,6 +13,7 @@ from src.application.agent.prompts import (
     lang_name,
 )
 from src.application.agent.tools import READING_TOOL_SCHEMAS, TOOL_SCHEMAS, AgentTools
+from src.domain.constants import DEFAULT_QUESTION_COUNT
 from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, VocabCard
 from src.domain.exceptions import WordCaptureError
 from src.domain.ports.article_fetcher import IArticleFetcher
@@ -60,6 +61,7 @@ class LessonAgent:
         target_lang: str,
         session_minutes: int,
         recent_topics: list[str],
+        question_count: int = DEFAULT_QUESTION_COUNT,
     ) -> tuple[str, str, str, list[str]]:
         """Fetch article and generate questions. Returns (title, url, text, questions)."""
         tools = AgentTools(self._fetcher, self._anki, target_lang)
@@ -79,8 +81,8 @@ class LessonAgent:
                     f"Goal: {goal}. Native language: {lang_name(native_lang)}. "
                     f"{history_note}\n\n"
                     f"1. Fetch a {lang_name(target_lang)} article\n"
-                    f"2. Return EXACTLY 3 comprehension questions IN "
-                    f"{lang_name(target_lang).upper()} (numbered 1. 2. 3.)\n"
+                    f"2. Return EXACTLY {question_count} comprehension questions IN "
+                    f"{lang_name(target_lang).upper()} (numbered 1. 2. etc.)\n"
                     "Do not do anything else yet."
                 ),
             ),
@@ -100,7 +102,7 @@ class LessonAgent:
                 continue
 
             if response.content:
-                questions = self._parse_questions(response.content)
+                questions = self._parse_questions(response.content, question_count)
                 article = tools.fetched_article
                 if article and questions:
                     return article.title, article.url, article.text, questions
@@ -348,14 +350,14 @@ class LessonAgent:
             backend_id=backend_id,
         )
 
-    def _parse_questions(self, text: str) -> list[str]:
+    def _parse_questions(self, text: str, count: int = 3) -> list[str]:
         import re
 
         lines = text.strip().split("\n")
         questions = []
         for line in lines:
             line = line.strip()
-            match = re.match(r"^[1-3][.)]\s+(.+)", line)
+            match = re.match(r"^\d+[.)]\s+(.+)", line)
             if match:
                 questions.append(match.group(1).strip())
-        return questions[:3]
+        return questions[:count]

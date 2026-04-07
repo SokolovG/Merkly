@@ -177,6 +177,31 @@ def deck_backend_error(detail: str) -> str:
     return f"Card backend error: {escape(detail)}"
 
 
+# --- Listening ---
+
+
+def listening_disabled() -> str:
+    return (
+        "🎧 Listening lessons are disabled in your settings.\n"
+        "Enable them in /settings → Strategy."
+    )
+
+
+def listening_fetching() -> str:
+    return "🎧 Finding a podcast episode for you..."
+
+
+def listening_transcribing() -> str:
+    return "✍️ Transcribing audio... (this takes ~10–20 seconds)"
+
+
+def listening_questions(questions: str) -> str:
+    return (
+        f"📝 Listen carefully, then answer these questions:\n\n{questions}\n\n"
+        "Send your answers when ready."
+    )
+
+
 # --- Strategy ---
 
 
@@ -184,6 +209,25 @@ def strategy_not_enabled(activity: str) -> str:
     return (
         f"📋 {activity.capitalize()} is not in your active strategy.\n" "Enable it via /settings."
     )
+
+
+# --- Settings: session/listening options ---
+
+
+def settings_qcount_updated(n: int) -> str:
+    return f"✅ Questions per session set to {n}."
+
+
+def settings_duration_updated(n: int) -> str:
+    return f"✅ Podcast clip length set to {n} minutes."
+
+
+def settings_duration_custom_prompt() -> str:
+    return "Send the desired clip length in minutes (1–60):"
+
+
+def settings_duration_invalid() -> str:
+    return "❌ Please send a number between 1 and 60."
 
 
 # --- Help ---

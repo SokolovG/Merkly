@@ -16,6 +16,20 @@ class PodcastFetcherRouter(IPodcastFetcher):
         self._podcast_index = podcast_index
         self._dw = dw
 
+    @classmethod
+    def build(
+        cls, podcast_index_api_key: str, podcast_index_api_secret: str
+    ) -> "PodcastFetcherRouter":
+        """Build the default router. All source knowledge lives here, not in the DI container."""
+        return cls(
+            itunes=ItunesPodcastFetcher(),
+            podcast_index=PodcastIndexFetcher(
+                api_key=podcast_index_api_key,
+                api_secret=podcast_index_api_secret,
+            ),
+            dw=DWPodcastFetcher(),
+        )
+
     async def fetch(self, level: str, language: str) -> PodcastEpisode:
         # 1. Try iTunes (all languages)
         episode = await self._itunes.fetch(level, language)

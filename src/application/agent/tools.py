@@ -40,7 +40,7 @@ TOOL_SCHEMAS: list[dict] = [
     {
         "type": "function",
         "function": {
-            "name": "create_anki_card",
+            "name": "create_flash_card",
             "description": "Create a flashcard for a vocabulary word from the target language",
             "parameters": {
                 "type": "object",
@@ -91,8 +91,8 @@ class AgentTools:
     async def _dispatch(self, name: str, arguments: dict) -> str:
         if name == "fetch_article":
             return await self._fetch_article(arguments["level"], arguments.get("source_url"))
-        if name == "create_anki_card":
-            return await self._create_anki_card(arguments)
+        if name == "create_flash_card":
+            return await self.create_flash_card(arguments)
         return f"Unknown tool: {name}"
 
     async def _fetch_article(self, level: str, source_url: str | None = None) -> str:
@@ -103,7 +103,7 @@ class AgentTools:
         except Exception as e:
             return f"ERROR fetching from {source_url or 'default'}: {e}. Try the next source_url."
 
-    async def _create_anki_card(self, args: dict) -> str:
+    async def create_flash_card(self, args: dict) -> str:
         word = args["word"]
         key = word.lower().strip()
         if key in self._created_words:

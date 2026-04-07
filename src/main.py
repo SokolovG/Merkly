@@ -49,3 +49,6 @@ if __name__ == "__main__":
 
 
 # TODO: add intruduction in start(help texts, explain logic of bot)
+# TODO: If the “thema” parameter is set to “study,”
+# that doesn't mean all the words have to be related to university and so on.
+# I'm teaching general language; individual words are useful, but not always

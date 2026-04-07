@@ -15,13 +15,10 @@ services:
       timeout: 5s
       retries: 5
   whisper:
-    build:
-      context: .
-      dockerfile: Dockerfile.whisper
+    image: fedirz/faster-whisper-server:latest-cpu
     restart: unless-stopped
     environment:
       - WHISPER__MODEL=base
-      - WHISPER__INFERENCE_DEVICE=cpu
     ports:
       - "8001:8000"
     volumes:
