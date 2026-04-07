@@ -88,7 +88,10 @@ async def cmd_start(
     profile = await profile_repo.get(user_id)
 
     if profile:
-        await message.answer(welcome_back(profile.level, profile.goal))
+        await message.answer(
+            welcome_back(profile.level, profile.goal, profile.vocab_card_count),
+            parse_mode="HTML",
+        )
     else:
         await dialog_manager.start(OnboardingSG.target_lang, mode=StartMode.RESET_STACK)
 
@@ -118,7 +121,7 @@ async def cmd_session(
     recent_topics = [s.article_title for s in recent]
 
     try:
-        title, url, text, questions = await agent.prepare_lesson(
+        title, url, text, questions = await agent.prepare_reading_lesson(
             level=profile.level,
             goal=profile.goal,
             native_lang=profile.native_lang,

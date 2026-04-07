@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.application.agent.core import CardBackend, LessonAgent
-from src.application.listening_service import ListeningService
+from src.application.listening_service import ListeningAgent
 from src.config import Settings
 from src.infrastructure.audio import AudioService
 from src.infrastructure.card_backends.anki import AnkiClient
@@ -114,8 +114,8 @@ class AppProvider(Provider):
         audio: AudioService,
         whisper: WhisperClient,
         llm: LLMClient,
-    ) -> ListeningService:
-        return ListeningService(podcast_fetcher, audio, whisper, llm)
+    ) -> ListeningAgent:
+        return ListeningAgent(podcast_fetcher, audio, whisper, llm)
 
 
 def create_container():

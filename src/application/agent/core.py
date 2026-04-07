@@ -53,7 +53,7 @@ class LessonAgent:
         self._fetcher = fetcher
         self._anki = anki
 
-    async def prepare_lesson(
+    async def prepare_reading_lesson(
         self,
         level: str,
         goal: str,

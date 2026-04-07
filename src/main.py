@@ -48,12 +48,9 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 
-# TODO: add intruduction in start(help texts, explain logic of bot)
 # TODO: If the “thema” parameter is set to “study,”
 # that doesn't mean all the words have to be related to university and so on.
 # I'm teaching general language; individual words are useful, but not always
-# TODO: rename/move prepare_lesson(its in AgentService/ListeningService)
+# → tracked in Phase 12 (vocab prompt improvement)
 # TODO: add reading/audio/writing pool like vocab pool
-# TODO: Request Entity Too Large - podcast dont cuts
-# TODO: whisper-1 is not a valid model name. Using base instead.
-# TODO: Detected language 'en' with probability 1.00
+# → tracked in Phase 12 (extend vocab pool to all activity types)

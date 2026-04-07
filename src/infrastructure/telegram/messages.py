@@ -5,11 +5,16 @@ from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT
 # --- Onboarding / profile ---
 
 
-def welcome_back(level: str, goal: str) -> str:
+def welcome_back(level: str, goal: str, vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
     return (
-        f"Welcome back! 👋\n"
-        f"Your level: {level} | Goal: {goal}\n\n"
-        "Type /session to start today's lesson."
+        f"Welcome back! 👋  Level: <b>{level}</b>  |  Goal: <b>{goal}</b>\n\n"
+        "<b>What you can do:</b>\n"
+        "/session — reading lesson (article + questions + writing)\n"
+        "/listen — listening lesson from a podcast\n"
+        f"/vocab — {vocab_card_count} vocabulary cards on a rotating topic\n"
+        "/settings — change language, level, strategy\n"
+        "/help — full command reference\n\n"
+        "<i>Tip: type <b>+word</b> anywhere to capture a word instantly.</i>"
     )
 
 

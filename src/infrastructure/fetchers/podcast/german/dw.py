@@ -10,8 +10,6 @@ _ITUNES_NS = "http://www.itunes.com/dtds/podcast-1.0.dtd"
 
 class DWPodcastFetcher(IPodcastFetcher):
     async def fetch(self, level: str, language: str) -> PodcastEpisode | None:
-        if language != "de":
-            return None
         try:
             async with httpx.AsyncClient(timeout=15) as client:
                 response = await client.get(_DW_RSS_URL)

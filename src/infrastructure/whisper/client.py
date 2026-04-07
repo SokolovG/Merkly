@@ -18,7 +18,7 @@ class WhisperClient:
             response = await self._client.post(
                 f"{self._base_url}/v1/audio/transcriptions",
                 files={"file": ("audio.mp3", f, "audio/mpeg")},
-                data={"model": "whisper-1"},
+                data={"model": "base"},
             )
         if response.status_code != 200:
             raise InfrastructureError(f"Whisper transcription failed: {response.text}")

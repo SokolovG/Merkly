@@ -21,7 +21,7 @@ class AudioLesson:
     transcript: str
 
 
-class ListeningService:
+class ListeningAgent:
     def __init__(
         self,
         podcast_fetcher: PodcastFetcherRouter,
@@ -41,7 +41,7 @@ class ListeningService:
         """
         episode = await self._fetcher.fetch(profile.level, profile.target_lang.value)
         logger.critical(f"episode - {episode.audio_url}, {episode.title}")
-        audio_path = await self._audio.download(episode.audio_url)
+        audio_path = await self._audio.download(episode.audio_url, profile.episode_duration_min)
         logger.critical(audio_path)
         transcript = await self._whisper.transcribe(audio_path)
         logger.critical(transcript)

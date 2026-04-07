@@ -7,7 +7,7 @@ from aiogram.types import BufferedInputFile, Message
 from dishka.integrations.aiogram import FromDishka
 
 from src.application.agent.core import LessonAgent
-from src.application.listening_service import ListeningService
+from src.application.listening_service import ListeningAgent
 from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.telegram import messages
@@ -23,7 +23,7 @@ _pending_listening: dict[int, dict] = {}
 async def cmd_listen(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
-    listening_service: FromDishka[ListeningService],
+    listening_service: FromDishka[ListeningAgent],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
