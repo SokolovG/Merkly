@@ -40,6 +40,9 @@ from src.infrastructure.telegram.states import OnboardingSG
 
 router = Router()
 
+_CB_DEL_CARD = "delcard"
+_CB_WRITING = "writing"
+
 # Simple in-memory stores (fine for hackathon)
 _pending_sessions: dict[int, dict] = {}
 _pending_writing: dict[int, dict] = {}
@@ -63,12 +66,14 @@ class _HasPendingWriting(BaseFilter):
 def _cards_keyboard(cards: list[VocabCard]) -> InlineKeyboardMarkup:
     """Inline keyboard with delete buttons (2 per row) + delete all."""
     btns = [
-        InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"delcard:{i}")
+        InlineKeyboardButton(text=delete_card_label(card.word), callback_data=f"{_CB_DEL_CARD}:{i}")
         for i, card in enumerate(cards)
     ]
     rows = [btns[i : i + 2] for i in range(0, len(btns), 2)]
     if len(cards) > 1:
-        rows.append([InlineKeyboardButton(text=delete_all_label(), callback_data="delcard:all")])
+        rows.append(
+            [InlineKeyboardButton(text=delete_all_label(), callback_data=f"{_CB_DEL_CARD}:all")]
+        )
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -281,9 +286,13 @@ async def handle_answer(
         writing_kb = InlineKeyboardMarkup(
             inline_keyboard=[
                 [
-                    InlineKeyboardButton(text="✍️ Sentences", callback_data="writing:sentences"),
-                    InlineKeyboardButton(text="📝 Grammar", callback_data="writing:grammar"),
-                    InlineKeyboardButton(text="📰 Essay text", callback_data="writing:article"),
+                    InlineKeyboardButton(
+                        text="✍️ Sentences", callback_data=f"{_CB_WRITING}:sentences"
+                    ),
+                    InlineKeyboardButton(text="📝 Grammar", callback_data=f"{_CB_WRITING}:grammar"),
+                    InlineKeyboardButton(
+                        text="📰 Essay text", callback_data=f"{_CB_WRITING}:article"
+                    ),
                 ]
             ]
         )
@@ -307,7 +316,7 @@ async def handle_answer(
     await session_repo.save(session)
 
 
-@router.callback_query(F.data.startswith("writing:"))
+@router.callback_query(F.data.startswith(f"{_CB_WRITING}:"))
 async def handle_writing_exercise_start(
     callback: CallbackQuery,
     agent: FromDishka[LessonAgent],
@@ -364,7 +373,7 @@ async def handle_writing(
         await message.answer(response, parse_mode="HTML")
 
 
-@router.callback_query(F.data.startswith("delcard:"))
+@router.callback_query(F.data.startswith(f"{_CB_DEL_CARD}:"))
 async def handle_delete_card(
     callback: CallbackQuery,
     agent: FromDishka[LessonAgent],

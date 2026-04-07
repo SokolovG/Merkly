@@ -6,23 +6,23 @@ from src.domain.entities import VocabCard
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.exceptions import CardBackendError
 
-_BASE_URL = "https://app.mochi.cards/api"
-
 logger = logging.getLogger(__name__)
 
 
-class MochiClient:
+class MochiClient(ICardGateway):
     """Mochi spaced-repetition card gateway.
 
     Auth: Basic auth with API key as username, empty password.
     Docs: https://mochi.cards/docs/api
     """
 
-    def __init__(self, api_key: str, deck_id: str) -> None:
+    def __init__(
+        self, api_key: str, deck_id: str, base_url: str = "https://app.mochi.cards/api"
+    ) -> None:
         self._deck_id = deck_id
         self._back_field_id: str | None = None  # discovered lazily from the deck template
         self._client = httpx.AsyncClient(
-            base_url=_BASE_URL,
+            base_url=base_url,
             auth=(api_key, ""),
             timeout=10,
         )
@@ -134,6 +134,3 @@ class MochiClient:
         if card.word_type:
             lines.append(f"\n`{card.word_type}`")
         return "\n".join(lines)
-
-
-_: ICardGateway = MochiClient.__new__(MochiClient)

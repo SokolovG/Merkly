@@ -4,11 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import Session, VocabCard
 from src.domain.enums import WordType
+from src.domain.ports.session_repo import ISessionRepository
 from src.infrastructure.database.models.profile_model import ProfileModel
 from src.infrastructure.database.models.session_model import SessionModel
 
 
-class SessionRepository:
+class SessionRepository(ISessionRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._db = session
 

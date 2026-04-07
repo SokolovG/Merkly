@@ -1,4 +1,4 @@
-from typing import Protocol
+from abc import ABC, abstractmethod
 
 import msgspec
 
@@ -10,5 +10,6 @@ class Article(msgspec.Struct):
     level: str  # "A2" | "B1" | "B2"
 
 
-class IArticleFetcher(Protocol):
+class IArticleFetcher(ABC):
+    @abstractmethod
     async def fetch(self, level: str, language: str, source_url: str | None = None) -> Article: ...

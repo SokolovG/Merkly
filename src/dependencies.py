@@ -67,11 +67,12 @@ class AppProvider(Provider):
     def card_gateway(self, settings: Settings) -> AnkiClient | MochiClient:
         match CardBackend(settings.CARD_BACKEND):
             case CardBackend.ANKI:
-                return AnkiClient(settings.anki_connect_url, deck=settings.anki_deck)
+                return AnkiClient(settings.ANKI_CONNECT_URL, deck=settings.ANKI_DECK)
             case CardBackend.MOCHI:
                 return MochiClient(
-                    api_key=settings.mochi_api_key.get_secret_value(),
-                    deck_id=settings.mochi_deck_id,
+                    api_key=settings.MOCHI_API_KEY.get_secret_value(),
+                    deck_id=settings.MOCHI_DECK_ID,
+                    base_url=settings.MOCHI_BASE_URL,
                 )
 
     @provide(scope=Scope.APP)

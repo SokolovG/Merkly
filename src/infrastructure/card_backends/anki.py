@@ -5,7 +5,7 @@ from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.exceptions import CardBackendError
 
 
-class AnkiClient:
+class AnkiClient(ICardGateway):
     def __init__(self, connect_url: str, deck: str = "Language::Daily") -> None:
         self._url = connect_url
         self._deck = deck
@@ -105,6 +105,3 @@ class AnkiClient:
     def _build_back(self, card: VocabCard) -> str:
         lines = [card.translation, "", f"<i>{card.example_sentence}</i>"]
         return "<br>".join(lines)
-
-
-_: ICardGateway = AnkiClient.__new__(AnkiClient)

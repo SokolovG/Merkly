@@ -7,19 +7,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
+from src.domain.constants import LANGUAGE_FLAGS
 from src.infrastructure.database.repositories import ProfileRepository
-
-_FLAG: dict[str, str] = {
-    "de": "🇩🇪",
-    "en": "🇬🇧",
-    "es": "🇪🇸",
-    "fr": "🇫🇷",
-    "it": "🇮🇹",
-    "pt": "🇧🇷",
-    "ru": "🇷🇺",
-    "ar": "🇸🇦",
-    "zh": "🇨🇳",
-}
 
 
 async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
@@ -35,7 +24,7 @@ async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
             current_hhmm = user_time.strftime("%H:%M")
 
             if current_hhmm == profile.reminder_time:
-                flag = _FLAG.get(profile.target_lang, "🌍")
+                flag = LANGUAGE_FLAGS.get(profile.target_lang, "🌍")
                 name = lang_name(profile.target_lang)
                 await bot.send_message(
                     chat_id=profile.telegram_id,

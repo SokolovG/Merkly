@@ -27,10 +27,11 @@ class Settings(BaseSettings):
 
     # Card backend
     CARD_BACKEND: Literal["anki", "mochi"] = "anki"
-    anki_connect_url: str = "http://localhost:8765"
-    anki_deck: str = "Language::Daily"
-    mochi_api_key: SecretStr = SecretStr("")
-    mochi_deck_id: str = ""
+    ANKI_CONNECT_URL: str = "http://localhost:8765"
+    ANKI_DECK: str = "Language::Daily"
+    MOCHI_API_KEY: SecretStr = SecretStr("")
+    MOCHI_DECK_ID: str = ""
+    MOCHI_BASE_URL: str = "https://app.mochi.cards/api"
 
     # Database
     DB_HOST: str

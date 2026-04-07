@@ -6,6 +6,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka
 
+from src.domain.constants import LANGUAGE_FLAGS
 from src.domain.enums import ActivityType, Goal, Language, Level
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.telegram.messages import complete_setup
@@ -22,17 +23,6 @@ _ACTIVITY_LABELS = {
     ActivityType.WRITING: "✍️ Writing",
     ActivityType.LISTENING: "🎧 Listening",
     ActivityType.VOCAB: "📚 Vocab",
-}
-
-_LANG_FLAGS = {
-    "de": "🇩🇪",
-    "en": "🇬🇧",
-    "es": "🇪🇸",
-    "fr": "🇫🇷",
-    "it": "🇮🇹",
-    "pt": "🇧🇷",
-    "ru": "🇷🇺",
-    "uk": "🇺🇦",
 }
 
 # Which submenu to return to after editing a field
@@ -55,7 +45,7 @@ _TOGGLE_SUBMENU = {
 
 
 def _lang_label(code: str) -> str:
-    return f"{_LANG_FLAGS.get(str(code), '')} {str(code).upper()}"
+    return f"{LANGUAGE_FLAGS.get(str(code), '')} {str(code).upper()}"
 
 
 # ── Text builders ────────────────────────────────────────────────────────────
