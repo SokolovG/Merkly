@@ -1,43 +1,41 @@
-import asyncio
-import functools
 import logging
 import random
 import re
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Coroutine
-from typing import Any, TypeVar
 
 import httpx
 
 from src.domain.ports.article_fetcher import Article, IArticleFetcher
+from src.infrastructure.decorators import retry
 from src.infrastructure.exceptions import FetcherError
 
 logger = logging.getLogger(__name__)
 
-P = TypeVar("P")
-T = TypeVar("T")
-
-
-def retry(
-    max_attempts: int, backoff: float, max_backoff: float = 30.0
-) -> Callable[[Callable[..., Coroutine[Any, Any, T]]], Callable[..., Coroutine[Any, Any, T]]]:
-    def decorator(
-        func: Callable[..., Coroutine[Any, Any, T]],
-    ) -> Callable[..., Coroutine[Any, Any, T]]:
-        @functools.wraps(func)
-        async def wrapper(*args: Any, **kwargs: Any) -> Any:
-            for attempt in range(max_attempts):
-                try:
-                    return await func(*args, **kwargs)
-                except Exception:
-                    if attempt == max_attempts - 1:
-                        raise
-                    wait = min(backoff * (2**attempt), max_backoff)
-                    await asyncio.sleep(wait)
-
-        return wrapper
-
-    return decorator
+# Default RSS sources per language — agent can override with source_url
+_DEFAULT_SOURCES: dict[str, list[str]] = {
+    "de": [
+        "https://www.tagesschau.de/xml/rss2/",
+        "https://rss.dw.com/rdf/rss-de-news",
+    ],
+    "en": [
+        "https://feeds.bbci.co.uk/news/rss.xml",
+        "https://rss.reuters.com/reuters/topNews",
+    ],
+    "es": [
+        "https://www.bbc.com/mundo/index.xml",
+        "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
+    ],
+    "fr": [
+        "https://www.france24.com/fr/rss",
+        "https://www.lemonde.fr/rss/une.xml",
+    ],
+    "it": [
+        "https://www.ansa.it/sito/notizie/topnews/topnews_rss.xml",
+    ],
+    "pt": [
+        "https://g1.globo.com/rss/g1/",
+    ],
+}
 
 
 def _truncate(text: str, max_words: int = 300) -> str:
@@ -48,9 +46,7 @@ def _truncate(text: str, max_words: int = 300) -> str:
 def _parse_rss_items(xml_text: str) -> list[ET.Element]:
     """Parse RSS items from both RSS 2.0 and RDF/RSS 1.0 formats."""
     root = ET.fromstring(xml_text)
-    # RSS 2.0: <rss><channel><item>
     items = root.findall(".//item")
-    # RDF/RSS 1.0: items may be in the default namespace http://purl.org/rss/1.0/
     if not items:
         items = root.findall(".//{http://purl.org/rss/1.0/}item")
     return items
@@ -84,7 +80,6 @@ class NewsArticleFetcher(IArticleFetcher):
 
         item = random.choice(items[:10])
 
-        # Handle both RSS 2.0 and RDF namespaced elements
         def find_text(el: ET.Element, tag: str) -> str:
             return el.findtext(tag) or el.findtext(f"{{http://purl.org/rss/1.0/}}{tag}") or ""
 
@@ -108,7 +103,6 @@ class NewsArticleFetcher(IArticleFetcher):
             resp = await self._client.get(url)
             html = resp.text
 
-            # Try JSON-LD articleBody first (clean, no JS noise)
             for m in re.finditer(
                 r'<script[^>]*type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
                 html,
@@ -122,7 +116,6 @@ class NewsArticleFetcher(IArticleFetcher):
                 except Exception:
                     continue
 
-            # Fallback: strip script/style blocks, then tags
             html = re.sub(
                 r"<(script|style)[^>]*>.*?</(script|style)>",
                 " ",
@@ -133,35 +126,3 @@ class NewsArticleFetcher(IArticleFetcher):
             return _truncate(re.sub(r"\s+", " ", text).strip())
         except Exception:
             return None
-
-
-# Default RSS sources per language — agent can override with source_url
-_DEFAULT_SOURCES: dict[str, list[str]] = {
-    "de": [
-        "https://www.tagesschau.de/xml/rss2/",
-        "https://rss.dw.com/rdf/rss-de-news",
-    ],
-    "en": [
-        "https://feeds.bbci.co.uk/news/rss.xml",
-        "https://rss.reuters.com/reuters/topNews",
-    ],
-    "es": [
-        "https://www.bbc.com/mundo/index.xml",
-        "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
-    ],
-    "fr": [
-        "https://www.france24.com/fr/rss",
-        "https://www.lemonde.fr/rss/une.xml",
-    ],
-    "it": [
-        "https://www.ansa.it/sito/notizie/topnews/topnews_rss.xml",
-    ],
-    "pt": [
-        "https://g1.globo.com/rss/g1/",
-    ],
-}
-
-# Keep old name as alias for container compatibility
-DWArticleFetcher = NewsArticleFetcher
-
-_: IArticleFetcher = NewsArticleFetcher.__new__(NewsArticleFetcher)
