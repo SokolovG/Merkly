@@ -42,5 +42,16 @@ ignore = ["B008"]
 [tool.ty.environment]
 python-version = "3.12"
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
 [dependency-groups]
-dev = ["ruff>=0.6", "ty>=0.0.1a6", "pre-commit>=3.8"]
+dev = [
+    "ruff>=0.6",
+    "ty>=0.0.1a6",
+    "pre-commit>=3.8",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "respx>=0.21",
+]

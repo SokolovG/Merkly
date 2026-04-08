@@ -35,7 +35,6 @@ services:
         condition: service_started
     volumes:
       - ./src:/app/src
-      - ./data:/app/data
     extra_hosts:
       # Allows bot to reach AnkiConnect running on host machine
       - "host.docker.internal:host-gateway"

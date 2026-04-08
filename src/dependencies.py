@@ -100,12 +100,16 @@ class AppProvider(Provider):
     # ── Audio / Listening ─────────────────────────────────────────────────────
 
     @provide(scope=Scope.APP)
-    def audio_service(self) -> AudioService:
-        return AudioService()
+    async def audio_service(self) -> AsyncGenerator[AudioService, None]:
+        service = AudioService()
+        yield service
+        await service.aclose()
 
     @provide(scope=Scope.APP)
-    def whisper_client(self, settings: Settings) -> WhisperClient:
-        return WhisperClient(base_url=settings.WHISPER_BASE_URL)
+    async def whisper_client(self, settings: Settings) -> AsyncGenerator[WhisperClient, None]:
+        client = WhisperClient(base_url=settings.WHISPER_BASE_URL)
+        yield client
+        await client.aclose()
 
     @provide(scope=Scope.APP)
     def listening_service(

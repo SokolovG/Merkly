@@ -1,6 +1,10 @@
+import logging
+
 import httpx
 
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
+
+logger = logging.getLogger(__name__)
 
 
 class ItunesPodcastFetcher(IPodcastFetcher):
@@ -34,5 +38,6 @@ class ItunesPodcastFetcher(IPodcastFetcher):
                     description=description,
                 )
             return None
-        except Exception:
+        except Exception as e:
+            logger.warning("ItunesPodcastFetcher failed: %s", e)
             return None

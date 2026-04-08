@@ -1,9 +1,12 @@
 import hashlib
+import logging
 import time
 
 import httpx
 
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
+
+logger = logging.getLogger(__name__)
 
 
 class PodcastIndexFetcher(IPodcastFetcher):
@@ -60,5 +63,6 @@ class PodcastIndexFetcher(IPodcastFetcher):
                     duration_seconds=item.get("duration", 0),
                     description=item.get("description", ""),
                 )
-        except Exception:
+        except Exception as e:
+            logger.warning("PodcastIndexFetcher failed: %s", e)
             return None

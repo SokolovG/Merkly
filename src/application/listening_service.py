@@ -5,8 +5,9 @@ from logging import getLogger
 from src.application.agent.prompts import build_system_prompt, lang_name
 from src.domain.entities import UserProfile
 from src.domain.ports.llm_gateway import Message
+from src.domain.ports.podcast_fetcher import IPodcastFetcher
 from src.infrastructure.audio import AudioService
-from src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter
+from src.infrastructure.exceptions import InfrastructureError
 from src.infrastructure.llm.client import LLMClient
 from src.infrastructure.whisper.client import WhisperClient
 
@@ -24,7 +25,7 @@ class AudioLesson:
 class ListeningAgent:
     def __init__(
         self,
-        podcast_fetcher: PodcastFetcherRouter,
+        podcast_fetcher: IPodcastFetcher,
         audio: AudioService,
         whisper: WhisperClient,
         llm: LLMClient,
@@ -35,18 +36,16 @@ class ListeningAgent:
         self._llm = llm
 
     async def prepare_lesson(self, profile: UserProfile) -> AudioLesson:
-        """Fetch podcast, download+trim, transcribe, generate questions.
-
-        Returns (audio_path, episode_title, questions, transcript).
-        """
+        """Fetch podcast, download+trim, transcribe, generate questions."""
         episode = await self._fetcher.fetch(profile.level, profile.target_lang.value)
+        if episode is None:
+            raise InfrastructureError(f"No podcast found for language={profile.target_lang.value}")
         audio_path = await self._audio.download(episode.audio_url, profile.episode_duration_min)
         transcript = await self._whisper.transcribe(audio_path)
         questions = await self._generate_questions(
             transcript, profile.level, profile.target_lang.value, profile.question_count
         )
-        audio_lesson = AudioLesson(audio_path, episode.title, questions, transcript)
-        return audio_lesson
+        return AudioLesson(audio_path, episode.title, questions, transcript)
 
     async def _generate_questions(
         self,
@@ -57,8 +56,8 @@ class ListeningAgent:
     ) -> list[str]:
         name = lang_name(target_lang)
         prompt = (
-            f"Based on the following podcast transcript in {name},generate exactly {question_count}"
-            f"comprehension questions for a {level} student. "
+            f"Based on the following podcast transcript in {name},"
+            f" generate exactly {question_count} comprehension questions for a {level} student. "
             f"Write the questions in {name.upper()}, numbered 1. 2. 3. etc. "
             f"Only output the numbered questions, no other text.\n\n"
             f"Transcript:\n{transcript[:3000]}"

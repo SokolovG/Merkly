@@ -4,6 +4,7 @@ import logging
 import feedparser
 
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
+from src.infrastructure.fetchers.podcast.utils import parse_duration
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ _ORF_FEEDS = [
 
 class ORFPodcastFetcher(IPodcastFetcher):
     async def fetch(self, level: str, language: str) -> PodcastEpisode | None:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         for feed_url in _ORF_FEEDS:
             try:
                 feed = await loop.run_in_executor(None, feedparser.parse, feed_url)
@@ -38,22 +39,10 @@ class ORFPodcastFetcher(IPodcastFetcher):
                 return PodcastEpisode(
                     title=entry.get("title", ""),
                     audio_url=audio_url,
-                    duration_seconds=_parse_duration(entry.get("itunes_duration", "0")),
+                    duration_seconds=parse_duration(entry.get("itunes_duration", "0")),
                     description=entry.get("summary", ""),
                 )
             except Exception as e:
                 logger.warning("ORF feed %s failed: %s", feed_url, e)
                 continue
         return None
-
-
-def _parse_duration(value: str) -> int:
-    try:
-        parts = value.strip().split(":")
-        if len(parts) == 3:
-            return int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-        if len(parts) == 2:
-            return int(parts[0]) * 60 + int(parts[1])
-        return int(value)
-    except (ValueError, AttributeError):
-        return 0

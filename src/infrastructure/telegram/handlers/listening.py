@@ -1,3 +1,4 @@
+import os
 from html import escape
 from logging import getLogger
 
@@ -41,15 +42,18 @@ async def cmd_listen(
     try:
         lesson = await listening_service.prepare_lesson(profile)
     except Exception as e:
-        logger.error(e)
+        logger.error("Failed to prepare listening lesson: %s", e, exc_info=True)
         await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
         return
 
-    with open(lesson.audio_path, "rb") as f:
-        await message.answer_audio(
-            BufferedInputFile(f.read(), filename="lesson.mp3"),
-            caption=f"🎧 {escape(lesson.title)}",
-        )
+    try:
+        with open(lesson.audio_path, "rb") as f:
+            await message.answer_audio(
+                BufferedInputFile(f.read(), filename="lesson.mp3"),
+                caption=f"🎧 {escape(lesson.title)}",
+            )
+    finally:
+        os.unlink(lesson.audio_path)
 
     await message.answer(messages.listening_transcribing())
 
@@ -65,7 +69,11 @@ async def cmd_listen(
     await message.answer(messages.listening_questions(questions_text))
 
 
-@router.message(lambda msg: msg.from_user is not None and msg.from_user.id in _pending_listening)
+@router.message(
+    lambda msg: msg.from_user is not None
+    and msg.text is not None
+    and msg.from_user.id in _pending_listening
+)
 async def handle_listening_answer(
     message: Message,
     agent: FromDishka[LessonAgent],
