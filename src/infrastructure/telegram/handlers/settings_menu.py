@@ -8,7 +8,10 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.domain.constants import EPISODE_DURATION_OPTIONS, LANGUAGE_FLAGS
 from src.domain.enums import ActivityType, Goal, Language, Level
+from src.infrastructure.card_backends.anki import AnkiClient
+from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.exceptions import CardBackendError
 from src.infrastructure.telegram.messages import complete_setup
 
 logger = logging.getLogger(__name__)
@@ -17,6 +20,8 @@ settings_router = Router()
 
 # user_id → (field, return_submenu)
 _editing: dict[int, tuple[str, str]] = {}
+# user_id → [(name, backend_id)] from last list_decks() call
+_waiting_deck: dict[int, list[tuple[str, str]]] = {}
 
 _ACTIVITY_LABELS = {
     ActivityType.READING: "📖 Reading",
@@ -31,18 +36,19 @@ _FIELD_SUBMENU = {
     "level": "profile",
     "goal": "profile",
     "native_lang": "profile",
-    "session_minutes": "main",
+    "session_minutes": "session",
+    "vocab_card_count": "session",
+    "question_count": "session",
+    "episode_duration_min": "session",
     "reminder_time": "schedule",
     "utc_offset": "schedule",
     "vocab_scheduler_time": "schedule",
-    "vocab_card_count": "main",
-    "question_count": "main",
-    "episode_duration_min": "main",
 }
 
 # Which submenu to return to after toggling
 _TOGGLE_SUBMENU = {
     "reminder_enabled": "schedule",
+    "vocab_scheduler_enabled": "schedule",
 }
 
 
@@ -54,25 +60,14 @@ def _lang_label(code: str) -> str:
 
 
 def _main_text(profile) -> str:
-    reminder_str = "off"
-    if profile.reminder_enabled:
-        sign = "+" if profile.utc_offset >= 0 else ""
-        reminder_str = f"{profile.reminder_time} (UTC{sign}{profile.utc_offset})"
     strategy_parts = "  ·  ".join(
         f"{label.split()[1]} {'✅' if a in profile.learning_strategy else '☐'}"
         for a, label in _ACTIVITY_LABELS.items()
     )
     return (
         "⚙️ <b>Settings</b>\n\n"
-        f"<b>Language</b>   {_lang_label(profile.target_lang)}\n"
-        f"<b>Level</b>      {profile.level}\n"
-        f"<b>Goal</b>       {profile.goal}\n"
-        f"<b>Native</b>     {_lang_label(profile.native_lang)}\n\n"
-        f"<b>Session</b>    {profile.session_minutes} min  ·  {profile.vocab_card_count} cards"
-        f"  ·  {profile.question_count} questions\n"
-        f"<b>Listening</b>  {profile.episode_duration_min} min clip\n"
-        f"<b>Reminder</b>   {reminder_str}\n\n"
-        f"<b>Strategy</b>\n{strategy_parts}"
+        f"<b>Language</b>   {_lang_label(profile.target_lang)}  ·  {profile.level}  ·  {profile.goal}\n"  # noqa
+        f"<b>Strategy</b>   {strategy_parts}"
     )
 
 
@@ -92,12 +87,24 @@ def _schedule_text(profile) -> str:
     if profile.reminder_enabled:
         sign = "+" if profile.utc_offset >= 0 else ""
         reminder_str = f"✅ {profile.reminder_time} (UTC{sign}{profile.utc_offset})"
+
+    sched_str = "❌ Off"
+    if profile.vocab_scheduler_enabled:
+        deck_name = "default deck"
+        if profile.vocab_scheduler_deck_id:
+            match = next(
+                (d for d in profile.decks if d.backend_id == profile.vocab_scheduler_deck_id),
+                None,
+            )
+            deck_name = match.name if match else profile.vocab_scheduler_deck_id
+        sched_str = f"✅ {profile.vocab_scheduler_time} → {deck_name}"
+
     return (
         "🔔 <b>Reminders & Schedule</b>\n\n"
         f"Reminder: {reminder_str}\n"
         f"⏰ Reminder time: {profile.reminder_time}\n"
         f"🌐 UTC offset: {profile.utc_offset:+}\n"
-        f"📅 Vocab scheduler: {profile.vocab_scheduler_time}\n\n"
+        f"📅 Vocab scheduler: {sched_str}\n\n"
         "Tap a field to edit:"
     )
 
@@ -110,10 +117,36 @@ def _strategy_text(profile) -> str:
     return f"📋 <b>Strategy</b>\n\n{lines}\n\nTap to toggle:"
 
 
+def _session_text(profile) -> str:
+    return (
+        "📊 <b>Session</b>\n\n"
+        f"⏱ Duration: {profile.session_minutes} min\n"
+        f"🃏 Vocab cards: {profile.vocab_card_count}\n"
+        f"❓ Questions: {profile.question_count}\n"
+        f"🎧 Listening clip: {profile.episode_duration_min} min\n\n"
+        "Tap a field to edit:"
+    )
+
+
 # ── Keyboard builders ────────────────────────────────────────────────────────
 
 
-def _main_keyboard(profile) -> InlineKeyboardMarkup:
+def _main_keyboard(_profile) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="👤 Profile", callback_data="settings:profile")],
+            [InlineKeyboardButton(text="📊 Session", callback_data="settings:session")],
+            [
+                InlineKeyboardButton(
+                    text="🔔 Reminders & Schedule", callback_data="settings:schedule"
+                )
+            ],
+            [InlineKeyboardButton(text="📋 Strategy", callback_data="settings:strategy")],
+        ]
+    )
+
+
+def _session_keyboard(profile) -> InlineKeyboardMarkup:
     duration_options = [
         InlineKeyboardButton(
             text=f"{'✅ ' if profile.episode_duration_min == n else ''}{n} min",
@@ -123,23 +156,16 @@ def _main_keyboard(profile) -> InlineKeyboardMarkup:
     ]
     question_options = [
         InlineKeyboardButton(
-            text=f"{'✅ ' if profile.question_count == n else ''}{n}Q",
+            text=f"{'✅ ' if profile.question_count == n else ''}{n} questions",
             callback_data=f"setpick:question_count:{n}",
         )
         for n in (2, 3, 5)
     ]
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text="👤 Profile", callback_data="settings:profile")],
             [
                 InlineKeyboardButton(
-                    text="🔔 Reminders & Schedule", callback_data="settings:schedule"
-                )
-            ],
-            [InlineKeyboardButton(text="📋 Strategy", callback_data="settings:strategy")],
-            [
-                InlineKeyboardButton(
-                    text=f"⏱ Session: {profile.session_minutes} min",
+                    text=f"⏱ Duration: {profile.session_minutes} min",
                     callback_data="set:session_minutes",
                 ),
                 InlineKeyboardButton(
@@ -149,6 +175,7 @@ def _main_keyboard(profile) -> InlineKeyboardMarkup:
             ],
             question_options,
             duration_options,
+            [InlineKeyboardButton(text="← Back", callback_data="settings:main")],
         ]
     )
 
@@ -175,6 +202,11 @@ def _profile_keyboard(profile) -> InlineKeyboardMarkup:
 
 def _schedule_keyboard(profile) -> InlineKeyboardMarkup:
     reminder_label = "🔔 Reminder: ✅ ON" if profile.reminder_enabled else "🔔 Reminder: ❌ OFF"
+    sched_label = (
+        "📅 Vocab scheduler: ✅ ON"
+        if profile.vocab_scheduler_enabled
+        else "📅 Vocab scheduler: ❌ OFF"
+    )
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=reminder_label, callback_data="settoggle:reminder_enabled")],
@@ -191,10 +223,16 @@ def _schedule_keyboard(profile) -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text=f"📅 Vocab scheduler: {profile.vocab_scheduler_time}",
+                    text=sched_label, callback_data="settoggle:vocab_scheduler_enabled"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=f"⏰ Scheduler time: {profile.vocab_scheduler_time}",
                     callback_data="set:vocab_scheduler_time",
                 )
             ],
+            [InlineKeyboardButton(text="🗂 Scheduler deck", callback_data="sched:pickdeck")],
             [InlineKeyboardButton(text="← Back", callback_data="settings:main")],
         ]
     )
@@ -220,6 +258,8 @@ def _strategy_keyboard(profile) -> InlineKeyboardMarkup:
 def _submenu_content(submenu: str, profile) -> tuple:
     if submenu == "profile":
         return _profile_text(profile), _profile_keyboard(profile)
+    if submenu == "session":
+        return _session_text(profile), _session_keyboard(profile)
     if submenu == "schedule":
         return _schedule_text(profile), _schedule_keyboard(profile)
     if submenu == "strategy":
@@ -383,10 +423,10 @@ async def handle_pick(
     updated = _update_profile(profile, **{field: value})
     await profile_repo.save(updated)
     await callback.answer(f"✅ Set to {value}")
+    submenu = _FIELD_SUBMENU.get(field, "main")
+    text, keyboard = _submenu_content(submenu, updated)
     if isinstance(callback.message, Message):
-        await callback.message.edit_text(
-            _main_text(updated), parse_mode="HTML", reply_markup=_main_keyboard(updated)
-        )
+        await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @settings_router.callback_query(F.data.startswith("settoggle:"))
@@ -427,6 +467,77 @@ async def handle_toggle(
     text, keyboard = _submenu_content(return_submenu, updated)
     if isinstance(callback.message, Message):
         await callback.message.edit_text(text, parse_mode="HTML", reply_markup=keyboard)
+
+
+@settings_router.callback_query(F.data == "sched:pickdeck")
+async def handle_sched_pickdeck(
+    callback: CallbackQuery,
+    card_gateway: FromDishka[AnkiClient | MochiClient],
+    profile_repo: FromDishka[ProfileRepository],
+) -> None:
+    user_id = callback.from_user.id
+    profile = await profile_repo.get(user_id)
+    if not profile:
+        await callback.answer("Profile not found.")
+        return
+    try:
+        decks = await card_gateway.list_decks()
+    except CardBackendError:
+        await callback.answer("Could not fetch decks.")
+        return
+    if not decks:
+        await callback.answer("No decks found. Create one with /newdeck.")
+        return
+    _waiting_deck[user_id] = decks
+    await callback.answer()
+    if isinstance(callback.message, Message):
+        deck_keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=f"✅ {name}"
+                        if backend_id == profile.vocab_scheduler_deck_id
+                        else name,
+                        callback_data=f"scheddeck:{i}",
+                    )
+                ]
+                for i, (name, backend_id) in enumerate(decks)
+            ]
+        )
+        await callback.message.reply("Choose the deck for daily vocab:", reply_markup=deck_keyboard)
+
+
+@settings_router.callback_query(F.data.startswith("scheddeck:"))
+async def handle_sched_deck_callback(
+    callback: CallbackQuery,
+    profile_repo: FromDishka[ProfileRepository],
+) -> None:
+    user_id = callback.from_user.id
+    decks = _waiting_deck.get(user_id)
+    if not decks:
+        await callback.answer("Session expired. Tap 'Scheduler deck' again.")
+        return
+    raw = (callback.data or "").split(":", 1)
+    if len(raw) < 2 or not raw[1].isdigit():
+        await callback.answer("Invalid selection.")
+        return
+    idx = int(raw[1])
+    if idx >= len(decks):
+        await callback.answer("Invalid selection.")
+        return
+    _, backend_id = decks[idx]
+    _waiting_deck.pop(user_id, None)
+    profile = await profile_repo.get(user_id)
+    if not profile:
+        await callback.answer("Profile not found.")
+        return
+    updated = _update_profile(profile, vocab_scheduler_deck_id=backend_id)
+    await profile_repo.save(updated)
+    await callback.answer("✅ Deck set")
+    if isinstance(callback.message, Message):
+        await callback.message.edit_text(
+            _schedule_text(updated), parse_mode="HTML", reply_markup=_schedule_keyboard(updated)
+        )
 
 
 @settings_router.message(lambda msg: msg.from_user is not None and msg.from_user.id in _editing)

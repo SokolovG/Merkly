@@ -46,11 +46,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-# TODO: If the “thema” parameter is set to “study,”
-# that doesn't mean all the words have to be related to university and so on.
-# I'm teaching general language; individual words are useful, but not always
-# → tracked in Phase 12 (vocab prompt improvement)
-# TODO: add reading/audio/writing pool like vocab pool
-# → tracked in Phase 12 (extend vocab pool to all activity types)
