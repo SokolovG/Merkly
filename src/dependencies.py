@@ -10,11 +10,16 @@ from sqlalchemy.ext.asyncio import (
 
 from src.application.agent.core import CardBackend, LessonAgent
 from src.application.listening_service import ListeningAgent
+from src.application.vocab_refill_service import VocabRefillService
 from src.config import Settings
 from src.infrastructure.audio import AudioService
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
-from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
+from src.infrastructure.database.repositories import (
+    ProfileRepository,
+    SessionRepository,
+    VocabPoolRepository,
+)
 from src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter
 from src.infrastructure.fetchers.rss import NewsArticleFetcher
 from src.infrastructure.llm.client import LLMClient
@@ -54,6 +59,10 @@ class AppProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def session_repo(self, session: AsyncSession) -> SessionRepository:
         return SessionRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def vocab_pool_repo(self, session: AsyncSession) -> VocabPoolRepository:
+        return VocabPoolRepository(session)
 
     @provide(scope=Scope.APP, provides=LLMClient)
     def llm(self, settings: Settings) -> LLMClient:
@@ -120,6 +129,14 @@ class AppProvider(Provider):
         llm: LLMClient,
     ) -> ListeningAgent:
         return ListeningAgent(podcast_fetcher, audio, whisper, llm)
+
+    @provide(scope=Scope.REQUEST)
+    def vocab_refill_service(
+        self,
+        agent: LessonAgent,
+        repo: VocabPoolRepository,
+    ) -> VocabRefillService:
+        return VocabRefillService(agent=agent, repo=repo)
 
 
 def create_container():

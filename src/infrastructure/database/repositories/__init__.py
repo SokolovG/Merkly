@@ -1,4 +1,5 @@
 from src.infrastructure.database.repositories.profile_repo import ProfileRepository
 from src.infrastructure.database.repositories.session_repo import SessionRepository
+from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 
-__all__ = ["ProfileRepository", "SessionRepository"]
+__all__ = ["ProfileRepository", "SessionRepository", "VocabPoolRepository"]

@@ -155,3 +155,7 @@ LANGUAGE_NAMES: dict[str, str] = {
 DEFAULT_QUESTION_COUNT: int = 3
 DEFAULT_EPISODE_DURATION_MIN: int = 3
 EPISODE_DURATION_OPTIONS: list[int] = [3, 5, 7, 10]
+
+POOL_THRESHOLD: int = 16  # Refill when pool drops below this
+POOL_FILL_SIZE: int = 30  # Cards to generate per LLM batch
+POOL_RECENT_HINT: int = 20  # Words passed as soft exclusion hint in LLM prompt

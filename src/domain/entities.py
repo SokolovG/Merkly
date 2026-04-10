@@ -52,6 +52,16 @@ class VocabCard(msgspec.Struct):
     backend_id: str | None = None
 
 
+class PooledVocabCard(msgspec.Struct):
+    id: int  # DB primary key — required for mark_shown
+    word: str
+    translation: str
+    example_sentence: str
+    word_type: WordType
+    article: str | None = None
+    target_lang: str = "de"
+
+
 class Session(msgspec.Struct):
     session_id: str
     user_id: int
