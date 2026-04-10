@@ -7,3 +7,4 @@ __pycache__/
 .paul
 .claude
 CLAUDE.md
+.pytest_cache

@@ -87,6 +87,17 @@ def vocab_not_found() -> str:
     return "No vocabulary found. Try /vocab again."
 
 
+# --- Repeat ---
+
+
+def repeat_header(count: int) -> str:
+    return f"🔁 <b>Repeat ({count} words)</b>\n\nTry to recall each translation:\n\n"
+
+
+def repeat_empty() -> str:
+    return "No vocab history yet. Run /vocab first to build your word bank."
+
+
 # --- Word capture ---
 
 

@@ -23,6 +23,10 @@ class IVocabPoolRepository(ABC):
         ...
 
     @abstractmethod
-    async def get_history_words(self, user_id: int, target_lang: str, limit: int) -> list[str]:
-        """Return most recently shown words (for soft exclusion hint in LLM prompt)."""
+    async def get_history_words(
+        self, user_id: int, target_lang: str, limit: int, oldest_first: bool = False
+    ) -> list[str]:
+        """Return shown words ordered by shown_at.
+        oldest_first=True for /repeat (spaced repetition);
+        oldest_first=False (default) for soft LLM exclusion hint (newest first)."""
         ...

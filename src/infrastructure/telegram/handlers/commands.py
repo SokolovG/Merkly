@@ -10,10 +10,12 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
+from src.application.vocab_refill_service import VocabRefillService
 from src.domain.entities import Session, VocabCard
 from src.domain.enums import ActivityType
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
+from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.telegram.messages import (
     all_cards_deleted,
     card_deleted,
@@ -26,6 +28,8 @@ from src.infrastructure.telegram.messages import (
     no_profile,
     preparing_lesson,
     preparing_writing,
+    repeat_empty,
+    repeat_header,
     reviewing_answers,
     reviewing_writing,
     session_expired,
@@ -46,7 +50,6 @@ _CB_WRITING = "writing"
 # Simple in-memory stores (fine for hackathon)
 _pending_sessions: dict[int, dict] = {}
 _pending_writing: dict[int, dict] = {}
-_vocab_topics: dict[int, list[str]] = {}
 _last_cards: dict[int, list[VocabCard]] = {}
 
 
@@ -167,6 +170,8 @@ async def cmd_vocab(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
     agent: FromDishka[LessonAgent],
+    pool_repo: FromDishka[VocabPoolRepository],
+    refill_service: FromDishka[VocabRefillService],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
@@ -204,33 +209,105 @@ async def cmd_vocab(
             else:
                 force_topic = args_str
 
-    recent = _vocab_topics.get(user_id, [])
     await message.answer(fetching_vocab())
-    try:
-        topic_name, cards = await agent.topic_vocab_lesson(
-            level=profile.level,
-            goal=profile.goal,
-            native_lang=profile.native_lang,
-            target_lang=profile.target_lang,
-            recent_topics=recent,
-            count=count,
-            force_topic=force_topic,
-        )
-    except Exception as e:
-        await message.answer(vocab_failed(str(e)))
+
+    # force_topic bypasses pool — user explicitly requested a specific topic (LLM override)
+    if force_topic is not None:
+        try:
+            topic_name, cards = await agent.topic_vocab_lesson(
+                level=profile.level,
+                goal=str(profile.goal),
+                native_lang=str(profile.native_lang),
+                target_lang=str(profile.target_lang),
+                recent_topics=[],
+                count=count,
+                force_topic=force_topic,
+            )
+        except Exception as e:
+            await message.answer(vocab_failed(str(e)))
+            return
+        if not cards:
+            await message.answer(vocab_empty())
+            return
+        card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in cards)
+        response = f"{vocab_header(topic_name, len(cards))}\n\n{card_list}"
+        _last_cards[user_id] = cards
+        await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
         return
 
-    if not cards:
+    # Normal path: serve from pool
+    target_lang = str(profile.target_lang)
+    pool_cards = await pool_repo.get_pool_cards(user_id, target_lang, count)
+
+    # On-miss fallback: trigger synchronous refill and retry once
+    if not pool_cards:
+        try:
+            await refill_service._refill(profile)
+        except Exception as e:
+            await message.answer(vocab_failed(str(e)))
+            return
+        pool_cards = await pool_repo.get_pool_cards(user_id, target_lang, count)
+
+    if not pool_cards:
         await message.answer(vocab_empty())
         return
 
-    recent.append(topic_name)
-    _vocab_topics[user_id] = recent[-5:]
+    # Create Anki/Mochi cards at serve time
+    vocab_cards: list[VocabCard] = []
+    deck_id = profile.active_deck_id or None
+    for pc in pool_cards:
+        vc = VocabCard(
+            word=pc.word,
+            translation=pc.translation,
+            example_sentence=pc.example_sentence,
+            word_type=pc.word_type,
+            article=pc.article,
+        )
+        backend_id = await agent._anki.create_card(vc, deck_id=deck_id)
+        vocab_cards.append(
+            VocabCard(
+                word=pc.word,
+                translation=pc.translation,
+                example_sentence=pc.example_sentence,
+                word_type=pc.word_type,
+                article=pc.article,
+                backend_id=backend_id,
+            )
+        )
 
-    card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in cards)
-    response = f"{vocab_header(topic_name, len(cards))}\n\n{card_list}"
-    _last_cards[user_id] = cards
-    await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(cards))
+    card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in vocab_cards)
+    response = f"{vocab_header('Vocabulary', len(vocab_cards))}\n\n{card_list}"
+    _last_cards[user_id] = vocab_cards
+    await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(vocab_cards))
+
+    # Mark served cards as shown (moves to history, removes from pool)
+    await pool_repo.mark_shown(user_id, [pc.id for pc in pool_cards])
+
+    # Eager refill: top up pool if below threshold (runs after response sent)
+    await refill_service.refill_if_needed(profile)
+
+
+@router.message(Command("repeat"))
+async def cmd_repeat(
+    message: Message,
+    profile_repo: FromDishka[ProfileRepository],
+    pool_repo: FromDishka[VocabPoolRepository],
+) -> None:
+    user_id = message.from_user.id  # type: ignore
+    profile = await profile_repo.get(user_id)
+    if not profile:
+        await message.answer(no_profile())
+        return
+
+    words = await pool_repo.get_history_words(
+        user_id, str(profile.target_lang), limit=10, oldest_first=True
+    )
+    if not words:
+        await message.answer(repeat_empty())
+        return
+
+    word_list = "\n".join(f"{i}. <b>{escape(w)}</b>" for i, w in enumerate(words, 1))
+    await message.answer(f"{repeat_header(len(words))}{word_list}", parse_mode="HTML")
 
 
 @router.message(Command("help"))

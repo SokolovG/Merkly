@@ -113,15 +113,22 @@ class VocabPoolRepository(IVocabPoolRepository):
 
         await self._db.commit()
 
-    async def get_history_words(self, user_id: int, target_lang: str, limit: int) -> list[str]:
+    async def get_history_words(
+        self, user_id: int, target_lang: str, limit: int, oldest_first: bool = False
+    ) -> list[str]:
         profile_id = await self._resolve_profile_id(user_id)
+        order = (
+            VocabHistoryModel.created_at.asc()
+            if oldest_first
+            else VocabHistoryModel.created_at.desc()
+        )
         result = await self._db.execute(
             select(VocabHistoryModel.word)
             .where(
                 VocabHistoryModel.user_id == profile_id,
                 VocabHistoryModel.target_lang == target_lang,
             )
-            .order_by(VocabHistoryModel.created_at.desc())
+            .order_by(order)
             .limit(limit)
         )
         return list(result.scalars().all())

@@ -7,8 +7,12 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
+from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import LANGUAGE_FLAGS
+from src.domain.entities import VocabCard
+from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 
 
 async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
@@ -56,25 +60,66 @@ async def send_scheduled_vocab(
             user_time = now_utc + timedelta(hours=profile.utc_offset)
             if user_time.strftime("%H:%M") != profile.vocab_scheduler_time:
                 continue
-            topic_name, cards = await agent.topic_vocab_lesson(
-                level=profile.level,
-                goal=profile.goal,
-                native_lang=profile.native_lang,
-                target_lang=profile.target_lang,
-                recent_topics=[],
-                count=profile.vocab_card_count,
+
+            async with session_factory() as session:
+                pool_repo = VocabPoolRepository(session)
+                pool_cards = await pool_repo.get_pool_cards(
+                    profile.telegram_id, str(profile.target_lang), profile.vocab_card_count
+                )
+                if not pool_cards:
+                    refill_service = VocabRefillService(agent=agent, repo=pool_repo)
+                    await refill_service._refill(profile)
+                    pool_cards = await pool_repo.get_pool_cards(
+                        profile.telegram_id, str(profile.target_lang), profile.vocab_card_count
+                    )
+                if not pool_cards:
+                    continue
+
+                vocab_cards = [
+                    VocabCard(
+                        word=pc.word,
+                        translation=pc.translation,
+                        example_sentence=pc.example_sentence,
+                        word_type=pc.word_type,
+                        article=pc.article,
+                    )
+                    for pc in pool_cards
+                ]
+                deck_id = profile.vocab_scheduler_deck_id or profile.active_deck_id or None
+                for vc in vocab_cards:
+                    await agent._anki.create_card(vc, deck_id=deck_id)
+                await pool_repo.mark_shown(profile.telegram_id, [pc.id for pc in pool_cards])
+
+            card_list = "\n".join(
+                f"• <b>{escape(c.word)}</b> — {escape(c.translation)}" for c in vocab_cards
             )
-            if cards:
-                card_list = "\n".join(
-                    f"• <b>{escape(c.word)}</b> — {escape(c.translation)}" for c in cards
-                )
-                await bot.send_message(
-                    chat_id=profile.telegram_id,
-                    text=f"🃏 <b>Daily vocab: {escape(topic_name)}</b>\n\n{card_list}",
-                    parse_mode="HTML",
-                )
+            await bot.send_message(
+                chat_id=profile.telegram_id,
+                text=f"🃏 <b>Daily vocab</b>\n\n{card_list}",
+                parse_mode="HTML",
+            )
         except Exception:
             pass
+
+
+async def refill_all_pools(
+    session_factory: async_sessionmaker,
+    agent: LessonAgent,
+) -> None:
+    """Nightly job: silently top up vocab pools for all users with VOCAB in learning strategy."""
+    async with session_factory() as session:
+        profiles = await ProfileRepository(session).all()
+
+    for profile in profiles:
+        if ActivityType.VOCAB not in profile.learning_strategy:
+            continue
+        try:
+            async with session_factory() as session:
+                pool_repo = VocabPoolRepository(session)
+                refill_service = VocabRefillService(agent=agent, repo=pool_repo)
+                await refill_service.refill_if_needed(profile)
+        except Exception:
+            pass  # Don't crash the scheduler if one user fails
 
 
 def setup_scheduler(
@@ -94,5 +139,12 @@ def setup_scheduler(
         trigger="cron",
         minute="*",
         kwargs={"bot": bot, "session_factory": session_factory, "agent": agent},
+    )
+    scheduler.add_job(
+        refill_all_pools,
+        trigger="cron",
+        hour=3,
+        minute=0,
+        kwargs={"session_factory": session_factory, "agent": agent},
     )
     return scheduler
