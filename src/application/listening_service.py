@@ -20,6 +20,7 @@ class AudioLesson:
     title: str
     questions: list[str]
     transcript: str
+    episode_url: str
 
 
 class ListeningAgent:
@@ -45,7 +46,7 @@ class ListeningAgent:
         questions = await self._generate_questions(
             transcript, profile.level, profile.target_lang.value, profile.question_count
         )
-        return AudioLesson(audio_path, episode.title, questions, transcript)
+        return AudioLesson(audio_path, episode.title, questions, transcript, episode.audio_url)
 
     async def _generate_questions(
         self,

@@ -186,15 +186,16 @@ def build_topic_vocab_prompt(
             f" No other text."
         )
 
-    topics = GOAL_TOPICS.get(goal, GOAL_TOPICS["general"])
     avoid = ", ".join(recent_topics) if recent_topics else "none"
-    topic_list = ", ".join(f'"{t}"' for t in topics)
     return (
         f"You are generating vocabulary flashcards for a {name} learner.\n"
         f"Level: {level}. Goal: {goal}. Native language: {native_name}.\n\n"
-        f"Available topics for this goal: {topic_list}\n"
-        f"Recently used topics (avoid these): {avoid}\n\n"
-        f"Pick ONE topic from the available list that has NOT been recently used.\n"
+        f"User goal: {goal} (use this as context — pick any high-frequency topic relevant to "
+        f"a learner with this goal, not limited to goal-specific jargon).\n"
+        f"Recently used topics (avoid): {avoid}\n\n"
+        f"Pick ONE topic you haven't recently covered. Choose vocabulary that is broadly useful "
+        f"and high-frequency for a {level} learner — prefer words they'll encounter in daily life, "
+        f"reading, or work over narrow technical terms.\n"
         f"Generate exactly {count} high-frequency, useful {name} words or phrases for that topic.\n"
         f"{card_instructions}"
         f"Start your response with exactly: 'Topic: [chosen topic name]' then create the {_card_str}."

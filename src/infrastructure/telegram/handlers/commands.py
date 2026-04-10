@@ -15,6 +15,7 @@ from src.domain.entities import Session, VocabCard
 from src.domain.enums import ActivityType
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
+from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.telegram.messages import (
     all_cards_deleted,
@@ -104,6 +105,7 @@ async def cmd_session(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
     session_repo: FromDishka[SessionRepository],
+    session_history_repo: FromDishka[SessionHistoryRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
@@ -137,6 +139,21 @@ async def cmd_session(
         await message.answer(lesson_failed(str(e)))
         return
 
+    # Dedup: retry once if this article URL was already served to this user
+    if await session_history_repo.has_seen(user_id, url):
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            title, url, text, questions = await agent.prepare_reading_lesson(
+                level=profile.level,
+                goal=profile.goal,
+                native_lang=profile.native_lang,
+                target_lang=profile.target_lang,
+                session_minutes=profile.session_minutes,
+                recent_topics=recent_topics,
+                question_count=profile.question_count,
+            )
+
     session_id = str(uuid.uuid4())[:8]
 
     article_msg = (
@@ -152,6 +169,7 @@ async def cmd_session(
     article_msg += f"\nSend your answers as one message (answer all {len(questions)})."
 
     await message.answer(article_msg, parse_mode="HTML")
+    await session_history_repo.record(user_id, url, ActivityType.READING)
 
     _pending_sessions[user_id] = {
         "session_id": session_id,

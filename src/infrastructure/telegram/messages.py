@@ -255,6 +255,7 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "/session — Start a reading lesson\n"
         "/listen — Start a listening lesson from a podcast\n"
         f"/vocab — Vocabulary cards ({vocab_card_count} words, topic rotates)\n"
+        "/repeat — Review previously seen words (oldest first, no cards created)\n"
         "/settings — Update your profile (language, level, goal, card count)\n"
         "/newdeck &lt;name&gt; — Create a new deck in Anki/Mochi and set it as active\n"
         "/setdeck — Pick your active deck from existing ones\n"

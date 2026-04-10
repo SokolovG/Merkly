@@ -17,6 +17,7 @@ from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import (
     ProfileRepository,
+    SessionHistoryRepository,
     SessionRepository,
     VocabPoolRepository,
 )
@@ -63,6 +64,10 @@ class AppProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def vocab_pool_repo(self, session: AsyncSession) -> VocabPoolRepository:
         return VocabPoolRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def session_history_repo(self, session: AsyncSession) -> SessionHistoryRepository:
+        return SessionHistoryRepository(session)
 
     @provide(scope=Scope.APP, provides=LLMClient)
     def llm(self, settings: Settings) -> LLMClient:

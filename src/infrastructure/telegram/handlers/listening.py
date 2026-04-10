@@ -11,6 +11,7 @@ from src.application.agent.core import LessonAgent
 from src.application.listening_service import ListeningAgent
 from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.telegram import messages
 
 logger = getLogger(__name__)
@@ -25,6 +26,7 @@ async def cmd_listen(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
     listening_service: FromDishka[ListeningAgent],
+    session_history_repo: FromDishka[SessionHistoryRepository],
 ) -> None:
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
@@ -46,6 +48,13 @@ async def cmd_listen(
         await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
         return
 
+    # Dedup: retry once if this episode URL was already served to this user
+    if await session_history_repo.has_seen(user_id, lesson.episode_url):
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            lesson = await listening_service.prepare_lesson(profile)
+
     try:
         with open(lesson.audio_path, "rb") as f:
             await message.answer_audio(
@@ -55,6 +64,7 @@ async def cmd_listen(
     finally:
         os.unlink(lesson.audio_path)
 
+    await session_history_repo.record(user_id, lesson.episode_url, ActivityType.LISTENING)
     await message.answer(messages.listening_transcribing())
 
     _pending_listening[user_id] = {
@@ -63,6 +73,7 @@ async def cmd_listen(
         "level": profile.level,
         "native_lang": profile.native_lang,
         "target_lang": profile.target_lang,
+        "episode_url": lesson.episode_url,
     }
 
     questions_text = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(lesson.questions))
@@ -70,9 +81,11 @@ async def cmd_listen(
 
 
 @router.message(
-    lambda msg: msg.from_user is not None
-    and msg.text is not None
-    and msg.from_user.id in _pending_listening
+    lambda msg: (
+        msg.from_user is not None
+        and msg.text is not None
+        and msg.from_user.id in _pending_listening
+    )
 )
 async def handle_listening_answer(
     message: Message,
