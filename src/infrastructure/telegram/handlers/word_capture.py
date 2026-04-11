@@ -100,9 +100,11 @@ async def handle_word_capture(
 
     display_word = f"{card.article} {card.word}" if card.article else card.word
     text = (
-        card_saved(display_word, card.translation, card.example_sentence)
+        card_saved(display_word, card.translation, card.example_sentence, card.grammar_note)
         if card.backend_id
-        else card_saved_no_backend(display_word, card.translation, card.example_sentence)
+        else card_saved_no_backend(
+            display_word, card.translation, card.example_sentence, card.grammar_note
+        )
     )
     await message.reply(text, parse_mode="HTML", reply_markup=_word_card_keyboard())
 
@@ -165,8 +167,10 @@ async def handle_regen_context(
 
     display_word = f"{card.article} {card.word}" if card.article else card.word
     text = (
-        card_saved(display_word, card.translation, card.example_sentence)
+        card_saved(display_word, card.translation, card.example_sentence, card.grammar_note)
         if card.backend_id
-        else card_saved_no_backend(display_word, card.translation, card.example_sentence)
+        else card_saved_no_backend(
+            display_word, card.translation, card.example_sentence, card.grammar_note
+        )
     )
     await message.reply(text, parse_mode="HTML", reply_markup=_word_card_keyboard())

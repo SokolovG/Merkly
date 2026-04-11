@@ -131,6 +131,8 @@ class MochiClient(ICardGateway):
             "",
             f"*{card.example_sentence}*",
         ]
+        if card.grammar_note:
+            lines += ["", card.grammar_note]
         if card.word_type:
             lines.append(f"\n`{card.word_type}`")
         return "\n".join(lines)

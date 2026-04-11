@@ -323,8 +323,15 @@ def build_word_capture_prompt(
         f"  word_type: one of noun / verb / adjective / phrase\n"
         f"  translation: {native_name} translation\n"
         f"  example_sentence: one natural {name} sentence using the word\n"
-        f"  grammar_note: one short note useful for learners "
-        f"(e.g. plural form for nouns, key conjugation for verbs) written in {native_name}. Max 1 sentence.\n\n"
+        f"  grammar_note: essential grammar info for this word, written in {native_name}. "
+        f"Use terminology and forms appropriate for {name} (not German-specific labels). Rules:\n"
+        f"    - If the input looks inflected (conjugated verb, plural noun, declined form): "
+        f"show the base/dictionary form first.\n"
+        f"    - Noun: include the plural form.\n"
+        f"    - Verb: include the past participle or equivalent perfective form in {name}.\n"
+        f"    - Verb with a common preposition: show the preposition and its required case/form.\n"
+        f"    - Adjective or phrase: one key usage note.\n"
+        f"    Max 2 short notes, semicolon-separated.\n\n"
         f'Example for "Brot" (German \u2192 English):\n'
         f'{{"word":"Brot","article":"das","word_type":"noun","translation":"bread",'
         f'"example_sentence":"Ich esse jeden Morgen frisches Brot.",'

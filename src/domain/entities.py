@@ -49,6 +49,7 @@ class VocabCard(msgspec.Struct):
     example_sentence: str
     word_type: WordType
     article: str | None = None
+    grammar_note: str | None = None
     backend_id: str | None = None
 
 

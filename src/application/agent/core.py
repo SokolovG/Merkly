@@ -335,6 +335,7 @@ class LessonAgent:
             example_sentence=data["example_sentence"],
             word_type=data["word_type"],
             article=data.get("article"),
+            grammar_note=data.get("grammar_note") or None,
         )
 
         try:
@@ -347,6 +348,7 @@ class LessonAgent:
             example_sentence=card.example_sentence,
             word_type=card.word_type,
             article=card.article,
+            grammar_note=card.grammar_note,
             backend_id=backend_id,
         )
 

@@ -109,18 +109,26 @@ def word_empty() -> str:
     return "Please add a word after +, e.g. <b>+Brot</b>"
 
 
-def card_saved(display_word: str, translation: str, example: str) -> str:
+def card_saved(
+    display_word: str, translation: str, example: str, grammar_note: str | None = None
+) -> str:
+    note_line = f"\n<i>{escape(grammar_note)}</i>" if grammar_note else ""
     return (
         f"✅ <b>{escape(display_word)}</b> — {escape(translation)}\n"
-        f"<i>{escape(example)}</i>\n"
+        f"<i>{escape(example)}</i>"
+        f"{note_line}\n"
         "📥 Saved to your deck"
     )
 
 
-def card_saved_no_backend(display_word: str, translation: str, example: str) -> str:
+def card_saved_no_backend(
+    display_word: str, translation: str, example: str, grammar_note: str | None = None
+) -> str:
+    note_line = f"\n<i>{escape(grammar_note)}</i>" if grammar_note else ""
     return (
         f"✅ <b>{escape(display_word)}</b> — {escape(translation)}\n"
-        f"<i>{escape(example)}</i>\n"
+        f"<i>{escape(example)}</i>"
+        f"{note_line}\n"
         "⚠️ Card saved locally (deck not connected)"
     )
 

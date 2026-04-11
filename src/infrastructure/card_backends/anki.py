@@ -104,4 +104,6 @@ class AnkiClient(ICardGateway):
 
     def _build_back(self, card: VocabCard) -> str:
         lines = [card.translation, "", f"<i>{card.example_sentence}</i>"]
+        if card.grammar_note:
+            lines += ["", f"<small>{card.grammar_note}</small>"]
         return "<br>".join(lines)
