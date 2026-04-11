@@ -6,7 +6,6 @@ class OnboardingSG(StatesGroup):
     level = State()
     goal = State()
     native_lang = State()
-    session_minutes = State()
     reminder = State()
     reminder_time = State()
     utc_offset = State()

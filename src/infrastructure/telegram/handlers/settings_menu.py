@@ -39,7 +39,6 @@ _FIELD_SUBMENU = {
     "level": "profile",
     "goal": "profile",
     "native_lang": "profile",
-    "session_minutes": "session",
     "vocab_card_count": "session",
     "question_count": "session",
     "episode_duration_min": "session",
@@ -123,7 +122,6 @@ def _strategy_text(profile) -> str:
 def _session_text(profile) -> str:
     return (
         "📊 <b>Session</b>\n\n"
-        f"⏱ Duration: {profile.session_minutes} min\n"
         f"🃏 Vocab cards: {profile.vocab_card_count}\n"
         f"❓ Questions: {profile.question_count}\n"
         f"🎧 Listening clip: {profile.episode_duration_min} min\n\n"
@@ -167,10 +165,6 @@ def _session_keyboard(profile) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(
-                    text=f"⏱ Duration: {profile.session_minutes} min",
-                    callback_data="set:session_minutes",
-                ),
                 InlineKeyboardButton(
                     text=f"🃏 Cards: {profile.vocab_card_count}",
                     callback_data="set:vocab_card_count",
@@ -290,7 +284,6 @@ _FIELD_PROMPTS: dict[str, str] = {
         "Native language — enter a code:\n<code>de  en  es  fr  it  pt  ru  uk</code>\n"
         "or a name (e.g. <code>Turkish</code>)"
     ),
-    "session_minutes": "Session duration in minutes (5–180):",
     "reminder_time": "Reminder time — enter <b>HH:MM</b> (e.g. <b>09:00</b>):",
     "utc_offset": "UTC offset — enter a number (e.g. <code>3</code>, <code>-5</code>):",
     "vocab_scheduler_time": "Vocab scheduler time — enter <b>HH:MM</b> (e.g. <b>09:00</b>):",
@@ -323,14 +316,6 @@ def _parse_value(field: str, raw: str):
             return Goal(value.lower()), None
         except ValueError:
             return None, "Unknown goal. Use: <code>travel work conversation general study</code>"
-    if field == "session_minutes":
-        try:
-            n = int(value)
-            if not 5 <= n <= 180:
-                raise ValueError
-            return n, None
-        except ValueError:
-            return None, "Enter a number between 5 and 180."
     if field in ("reminder_time", "vocab_scheduler_time"):
         value = value.replace(".", ":")
         if not re.match(r"^\d{1,2}:\d{2}$", value):

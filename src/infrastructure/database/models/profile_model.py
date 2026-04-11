@@ -13,7 +13,6 @@ class ProfileModel(Base):
     level: Mapped[str] = mapped_column(Text, nullable=False)
     goal: Mapped[str] = mapped_column(Text, nullable=False)
     native_lang: Mapped[str] = mapped_column(Text, nullable=False)
-    session_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     target_lang: Mapped[str] = mapped_column(Text, nullable=False, server_default="de")
     reminder_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     reminder_time: Mapped[str] = mapped_column(Text, nullable=False, server_default="11:00")

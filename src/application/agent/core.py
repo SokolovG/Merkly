@@ -60,7 +60,6 @@ class LessonAgent:
         goal: str,
         native_lang: str,
         target_lang: str,
-        session_minutes: int,
         recent_topics: list[str],
         question_count: int = DEFAULT_QUESTION_COUNT,
     ) -> tuple[str, str, str, list[str]]:

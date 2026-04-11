@@ -131,7 +131,6 @@ async def cmd_session(
             goal=profile.goal,
             native_lang=profile.native_lang,
             target_lang=profile.target_lang,
-            session_minutes=profile.session_minutes,
             recent_topics=recent_topics,
             question_count=profile.question_count,
         )
@@ -149,7 +148,6 @@ async def cmd_session(
                 goal=profile.goal,
                 native_lang=profile.native_lang,
                 target_lang=profile.target_lang,
-                session_minutes=profile.session_minutes,
                 recent_topics=recent_topics,
                 question_count=profile.question_count,
             )

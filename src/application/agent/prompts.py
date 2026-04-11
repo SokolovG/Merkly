@@ -75,7 +75,6 @@ def build_lesson_prompt(
     goal: str,
     native_lang: str,
     target_lang: str,
-    session_minutes: int,
     recent_sessions: list[str],
 ) -> str:
     history_note = ""
@@ -89,7 +88,6 @@ Start a {name} lesson for this student:
 - Level: {level}
 - Goal: {goal}
 - Native language: {native_lang}
-- Session duration: {session_minutes} minutes
 {history_note}
 
 Steps:

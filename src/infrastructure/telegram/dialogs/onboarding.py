@@ -62,27 +62,6 @@ async def on_native_lang_text(
     await manager.next()
 
 
-# ── session minutes ────────────────────────────────────────────────────────────
-
-
-async def on_minutes(callback: CallbackQuery, button: Any, manager: DialogManager) -> None:
-    manager.dialog_data["session_minutes"] = int(button.widget_id.replace("min_", ""))
-    await manager.next()
-
-
-async def on_minutes_text(
-    message: Message, widget: Any, manager: DialogManager, value: str
-) -> None:
-    try:
-        mins = int(value.strip())
-        if mins < 5 or mins > 180:
-            raise ValueError
-        manager.dialog_data["session_minutes"] = mins
-        await manager.next()
-    except ValueError:
-        await message.answer("Please enter a number between 5 and 180, e.g. 25")
-
-
 # ── reminder ───────────────────────────────────────────────────────────────────
 
 
@@ -240,16 +219,6 @@ onboarding_dialog = Dialog(
         state=OnboardingSG.native_lang,
     ),
     Window(
-        Const("How long should each session be?\n\nPick one or type your own (e.g. 25):"),
-        Row(
-            Button(Const("15 min"), id="min_15", on_click=on_minutes),
-            Button(Const("30 min"), id="min_30", on_click=on_minutes),
-            Button(Const("60 min"), id="min_60", on_click=on_minutes),
-        ),
-        TextInput(id="minutes_input", type_factory=str, on_success=on_minutes_text),
-        state=OnboardingSG.session_minutes,
-    ),
-    Window(
         Const("Would you like a daily reminder to practice?"),
         Row(
             Button(Const("Yes, remind me"), id="remind_yes", on_click=on_reminder),
@@ -321,7 +290,6 @@ onboarding_dialog = Dialog(
             "📊 Level: {dialog_data[level]}\n"
             "🎯 Goal: {dialog_data[goal]}\n"
             "🗣 Native language: {dialog_data[native_lang]}\n"
-            "⏱ Session: {dialog_data[session_minutes]} min\n"
             "🃏 Vocab cards: {dialog_data[vocab_card_count]}\n\n"
             "Tap below to save and start!"
         ),

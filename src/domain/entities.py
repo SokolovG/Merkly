@@ -19,7 +19,6 @@ class UserProfile(msgspec.Struct):
     level: str
     goal: Goal
     native_lang: Language
-    session_minutes: int
     target_lang: Language = Language.DE
     reminder_enabled: bool = False
     reminder_time: str = DEFAULT_REMINDER_TIME
