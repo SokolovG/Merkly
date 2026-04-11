@@ -27,6 +27,7 @@ _COMMANDS = [
     _Cmd("listen", "Start a listening lesson from a podcast"),
     _Cmd("vocab", "Goal-aware vocabulary cards (topic rotates)"),
     _Cmd("repeat", "Review previously seen words (oldest first)"),
+    _Cmd("clearvocab", "Clear vocab pool — next /vocab refills with fresh words"),
     _Cmd("settings", "Update your profile and scheduler"),
     _Cmd("newdeck", "Create a new deck in Anki/Mochi"),
     _Cmd("setdeck", "Pick your active deck"),

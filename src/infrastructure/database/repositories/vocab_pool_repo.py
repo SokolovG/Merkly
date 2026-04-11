@@ -113,6 +113,24 @@ class VocabPoolRepository(IVocabPoolRepository):
 
         await self._db.commit()
 
+    async def clear_pool(self, user_id: int, target_lang: str) -> int:
+        profile_id = await self._resolve_profile_id(user_id)
+        count_result = await self._db.execute(
+            select(func.count()).where(
+                VocabPoolModel.user_id == profile_id,
+                VocabPoolModel.target_lang == target_lang,
+            )
+        )
+        count: int = count_result.scalar_one()
+        await self._db.execute(
+            delete(VocabPoolModel).where(
+                VocabPoolModel.user_id == profile_id,
+                VocabPoolModel.target_lang == target_lang,
+            )
+        )
+        await self._db.commit()
+        return count
+
     async def get_history_words(
         self, user_id: int, target_lang: str, limit: int, oldest_first: bool = False
     ) -> list[str]:

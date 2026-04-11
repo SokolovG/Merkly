@@ -1,5 +1,6 @@
 import logging
 
+from src.application.agent.prompts import strip_article_from_word
 from src.domain.entities import VocabCard
 from src.domain.ports.article_fetcher import Article, IArticleFetcher
 from src.domain.ports.card_gateway import ICardGateway
@@ -74,10 +75,17 @@ TOOL_SCHEMAS: list[dict] = [
 
 
 class AgentTools:
-    def __init__(self, fetcher: IArticleFetcher, anki: ICardGateway, target_lang: str) -> None:
+    def __init__(
+        self,
+        fetcher: IArticleFetcher,
+        anki: ICardGateway,
+        target_lang: str,
+        pool_mode: bool = False,
+    ) -> None:
         self._fetcher = fetcher
         self._anki = anki
         self._target_lang = target_lang
+        self._pool_mode = pool_mode  # True = collect cards only, skip backend
         self.fetched_article: Article | None = None
         self.created_cards: list[VocabCard] = []
         self._created_words: set[str] = set()
@@ -104,7 +112,8 @@ class AgentTools:
             return f"ERROR fetching from {source_url or 'default'}: {e}. Try the next source_url."
 
     async def create_flash_card(self, args: dict) -> str:
-        word = args["word"]
+        article = args.get("article") or None
+        word = strip_article_from_word(args["word"], article)
         key = word.lower().strip()
         if key in self._created_words:
             return f"Skipped duplicate: {word}"
@@ -113,9 +122,13 @@ class AgentTools:
             translation=args["translation"],
             example_sentence=args["example_sentence"],
             word_type=args["word_type"],
-            article=args.get("article"),
+            article=article,
         )
         self._created_words.add(key)
+        if self._pool_mode:
+            # Refill path: store in DB pool only, no backend call
+            self.created_cards.append(card)
+            return f"Pooled: {card.word} → {card.translation}"
         backend_id = await self._anki.create_card(card)
         card = VocabCard(
             word=card.word,

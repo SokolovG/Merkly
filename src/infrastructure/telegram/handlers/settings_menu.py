@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 
@@ -6,11 +7,13 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka
 
+from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import EPISODE_DURATION_OPTIONS, LANGUAGE_FLAGS
 from src.domain.enums import ActivityType, Goal, Language, Level
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.exceptions import CardBackendError
 from src.infrastructure.telegram.messages import complete_setup
 
@@ -310,10 +313,11 @@ def _parse_value(field: str, raw: str):
         except ValueError:
             return val, None
     if field == "level":
+        normalized = value.upper().replace(" ", "")
         try:
-            return Level(value.upper()), None
+            return Level(normalized), None
         except ValueError:
-            return value, None  # accept custom levels like "B1+"
+            return normalized, None  # accept custom levels like "B1+"
     if field == "goal":
         try:
             return Goal(value.lower()), None
@@ -544,6 +548,8 @@ async def handle_sched_deck_callback(
 async def handle_field_input(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    vocab_pool_repo: FromDishka[VocabPoolRepository],
+    refill_service: FromDishka[VocabRefillService],
 ) -> None:
     if message.from_user is None or not message.text:
         return
@@ -564,5 +570,14 @@ async def handle_field_input(
     _editing.pop(user_id, None)
     updated = _update_profile(profile, **{field: parsed})
     await profile_repo.save(updated)
+    if field == "level" and str(profile.level).upper().replace(" ", "") != str(
+        parsed
+    ).upper().replace(" ", ""):
+        cleared = await vocab_pool_repo.clear_pool(user_id, str(profile.target_lang))
+        if cleared:
+            await message.reply(
+                f"♻️ Vocab pool cleared ({cleared} cards) — refilling at {parsed} level…"
+            )
+            asyncio.create_task(refill_service._refill(updated))
     text, keyboard = _submenu_content(return_submenu, updated)
     await message.reply(text, parse_mode="HTML", reply_markup=keyboard)

@@ -11,6 +11,7 @@ from src.application.agent.prompts import (
     build_writing_review_prompt,
     build_writing_task_prompt,
     lang_name,
+    strip_article_from_word,
 )
 from src.application.agent.tools import READING_TOOL_SCHEMAS, TOOL_SCHEMAS, AgentTools
 from src.domain.constants import DEFAULT_QUESTION_COUNT
@@ -223,9 +224,13 @@ class LessonAgent:
         recent_topics: list[str],
         count: int = DEFAULT_VOCAB_CARD_COUNT,
         force_topic: str | None = None,
+        pool_mode: bool = False,
     ) -> tuple[str, list[VocabCard]]:
-        """Generate goal-aware vocabulary cards for a chosen topic. Returns (topic_name, cards)."""
-        tools = AgentTools(self._fetcher, self._anki, target_lang)
+        """Generate goal-aware vocabulary cards for a chosen topic. Returns (topic_name, cards).
+
+        pool_mode=True: collect cards only, skip backend (Anki/Mochi) — used by VocabRefillService.
+        """
+        tools = AgentTools(self._fetcher, self._anki, target_lang, pool_mode=pool_mode)
         messages = [
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(
@@ -329,12 +334,13 @@ class LessonAgent:
         if missing:
             raise WordCaptureError(f"LLM response missing fields: {missing}")
 
+        article = data.get("article") or None
         card = VocabCard(
-            word=data["word"],
+            word=strip_article_from_word(data["word"], article),
             translation=data["translation"],
             example_sentence=data["example_sentence"],
             word_type=data["word_type"],
-            article=data.get("article"),
+            article=article,
             grammar_note=data.get("grammar_note") or None,
         )
 

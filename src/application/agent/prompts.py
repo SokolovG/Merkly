@@ -33,6 +33,13 @@ LANG_NAMES: dict[str, str] = {
 }
 
 
+def strip_article_from_word(word: str, article: str | None) -> str:
+    """Remove article prefix from word if LLM included it (e.g. 'die Abreise' → 'Abreise')."""
+    if article and word.lower().startswith(article.lower() + " "):
+        return word[len(article) + 1 :]
+    return word
+
+
 def lang_name(code: str) -> str:
     # If it's a known code, return the name. Otherwise use as-is (user typed full name).
     return LANG_NAMES.get(code.lower(), code)
@@ -189,14 +196,15 @@ def build_topic_vocab_prompt(
     avoid = ", ".join(recent_topics) if recent_topics else "none"
     return (
         f"You are generating vocabulary flashcards for a {name} learner.\n"
-        f"Level: {level}. Goal: {goal}. Native language: {native_name}.\n\n"
-        f"User goal: {goal} (use this as context — pick any high-frequency topic relevant to "
-        f"a learner with this goal, not limited to goal-specific jargon).\n"
+        f"Level: {level}. Native language: {native_name}.\n\n"
         f"Recently used topics (avoid): {avoid}\n\n"
-        f"Pick ONE topic you haven't recently covered. Choose vocabulary that is broadly useful "
-        f"and high-frequency for a {level} learner — prefer words they'll encounter in daily life, "
-        f"reading, or work over narrow technical terms.\n"
+        f"Pick ONE everyday topic you haven't recently covered — things like food, travel, emotions, "
+        f"health, work, nature, home, relationships, shopping, weather, etc. "
+        f"Choose vocabulary that is broadly useful and high-frequency for a {level} learner. "
+        f"Prefer words they will encounter in daily life and real conversations over technical or academic terms.\n"
         f"Generate exactly {count} high-frequency, useful {name} words or phrases for that topic.\n"
+        f"Word type distribution: ~50% verbs, ~30% nouns, ~15% adjectives, ~5% phrases. "
+        f"Do NOT default to nouns only — verbs are the most important for fluency.\n"
         f"{card_instructions}"
         f"Start your response with exactly: 'Topic: [chosen topic name]' then create the {_card_str}."
         f" No other text."

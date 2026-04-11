@@ -30,3 +30,9 @@ class IVocabPoolRepository(ABC):
         oldest_first=True for /repeat (spaced repetition);
         oldest_first=False (default) for soft LLM exclusion hint (newest first)."""
         ...
+
+    @abstractmethod
+    async def clear_pool(self, user_id: int, target_lang: str) -> int:
+        """Delete all pending cards from vocab_pool for this user+lang.
+        Returns the number of cards deleted."""
+        ...

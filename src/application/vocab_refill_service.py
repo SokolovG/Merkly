@@ -40,6 +40,7 @@ class VocabRefillService:
             target_lang=str(profile.target_lang),
             recent_topics=hint_words,
             count=POOL_FILL_SIZE,
+            pool_mode=True,
         )
         await self._repo.add_to_pool(profile.telegram_id, cards, str(profile.target_lang))
         logger.info(

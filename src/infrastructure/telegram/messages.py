@@ -110,19 +110,28 @@ def word_empty() -> str:
 
 
 def card_saved(
-    display_word: str, translation: str, example: str, grammar_note: str | None = None
+    display_word: str,
+    translation: str,
+    example: str,
+    grammar_note: str | None = None,
+    deck_name: str | None = None,
 ) -> str:
     note_line = f"\n<i>{escape(grammar_note)}</i>" if grammar_note else ""
+    saved_to = f"📥 Saved to <b>{escape(deck_name)}</b>" if deck_name else "📥 Saved to your deck"
     return (
         f"✅ <b>{escape(display_word)}</b> — {escape(translation)}\n"
         f"<i>{escape(example)}</i>"
         f"{note_line}\n"
-        "📥 Saved to your deck"
+        f"{saved_to}"
     )
 
 
 def card_saved_no_backend(
-    display_word: str, translation: str, example: str, grammar_note: str | None = None
+    display_word: str,
+    translation: str,
+    example: str,
+    grammar_note: str | None = None,
+    deck_name: str | None = None,
 ) -> str:
     note_line = f"\n<i>{escape(grammar_note)}</i>" if grammar_note else ""
     return (
@@ -146,8 +155,8 @@ def word_capture_error() -> str:
 
 def ask_for_context() -> str:
     return (
-        "Send context for the word "
-        "(e.g. <i>slang</i>, <i>food</i>, <i>Sprichwort</i>, <i>biology</i>)"
+        "What context? Send anything — a word, phrase, or sentence.\n"
+        "(e.g. <i>slang</i>, <i>food</i>, <i>Dialect</i>)"
     )
 
 
@@ -206,8 +215,7 @@ def deck_backend_error(detail: str) -> str:
 
 def listening_disabled() -> str:
     return (
-        "🎧 Listening lessons are disabled in your settings.\n"
-        "Enable them in /settings → Strategy."
+        "🎧 Listening lessons are disabled in your settings.\nEnable them in /settings → Strategy."
     )
 
 
@@ -230,9 +238,7 @@ def listening_questions(questions: str) -> str:
 
 
 def strategy_not_enabled(activity: str) -> str:
-    return (
-        f"📋 {activity.capitalize()} is not in your active strategy.\n" "Enable it via /settings."
-    )
+    return f"📋 {activity.capitalize()} is not in your active strategy.\nEnable it via /settings."
 
 
 # --- Settings: session/listening options ---
@@ -264,6 +270,7 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "/listen — Start a listening lesson from a podcast\n"
         f"/vocab — Vocabulary cards ({vocab_card_count} words, topic rotates)\n"
         "/repeat — Review previously seen words (oldest first, no cards created)\n"
+        "/clearvocab — Clear vocab pool (use after changing level or to force fresh words)\n"
         "/settings — Update your profile (language, level, goal, card count)\n"
         "/newdeck &lt;name&gt; — Create a new deck in Anki/Mochi and set it as active\n"
         "/setdeck — Pick your active deck from existing ones\n"

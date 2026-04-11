@@ -328,6 +328,26 @@ async def cmd_repeat(
     await message.answer(f"{repeat_header(len(words))}{word_list}", parse_mode="HTML")
 
 
+@router.message(Command("clearvocab"))
+async def cmd_clearvocab(
+    message: Message,
+    profile_repo: FromDishka[ProfileRepository],
+    pool_repo: FromDishka[VocabPoolRepository],
+) -> None:
+    user_id = message.from_user.id  # type: ignore
+    profile = await profile_repo.get(user_id)
+    if not profile:
+        await message.answer(no_profile())
+        return
+    cleared = await pool_repo.clear_pool(user_id, str(profile.target_lang))
+    if cleared:
+        await message.answer(
+            f"♻️ Vocab pool cleared ({cleared} cards). Next /vocab will refill with fresh words."
+        )
+    else:
+        await message.answer("Pool is already empty. /vocab will trigger a refill.")
+
+
 @router.message(Command("help"))
 async def cmd_help(
     message: Message,

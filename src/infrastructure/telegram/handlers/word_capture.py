@@ -73,6 +73,11 @@ async def handle_word_capture(
         await message.reply(complete_setup())
         return
 
+    deck_name = next(
+        (d.name for d in profile.decks if d.backend_id == profile.active_deck_id),
+        None,
+    )
+
     await message.reply(looking_up(word), parse_mode="HTML")
 
     try:
@@ -96,14 +101,17 @@ async def handle_word_capture(
         "target_lang": profile.target_lang,
         "native_lang": profile.native_lang,
         "active_deck_id": profile.active_deck_id,
+        "deck_name": deck_name,
     }
 
     display_word = f"{card.article} {card.word}" if card.article else card.word
     text = (
-        card_saved(display_word, card.translation, card.example_sentence, card.grammar_note)
+        card_saved(
+            display_word, card.translation, card.example_sentence, card.grammar_note, deck_name
+        )
         if card.backend_id
         else card_saved_no_backend(
-            display_word, card.translation, card.example_sentence, card.grammar_note
+            display_word, card.translation, card.example_sentence, card.grammar_note, deck_name
         )
     )
     await message.reply(text, parse_mode="HTML", reply_markup=_word_card_keyboard())
@@ -135,6 +143,7 @@ async def handle_regen_context(
     context = message.text.strip()
     word: str = ctx["word"]
     old_card: VocabCard = ctx["card"]
+    deck_name: str | None = ctx.get("deck_name")
 
     if old_card.backend_id:
         with contextlib.suppress(Exception):
@@ -163,14 +172,17 @@ async def handle_regen_context(
         "target_lang": ctx["target_lang"],
         "native_lang": ctx["native_lang"],
         "active_deck_id": ctx.get("active_deck_id"),
+        "deck_name": deck_name,
     }
 
     display_word = f"{card.article} {card.word}" if card.article else card.word
     text = (
-        card_saved(display_word, card.translation, card.example_sentence, card.grammar_note)
+        card_saved(
+            display_word, card.translation, card.example_sentence, card.grammar_note, deck_name
+        )
         if card.backend_id
         else card_saved_no_backend(
-            display_word, card.translation, card.example_sentence, card.grammar_note
+            display_word, card.translation, card.example_sentence, card.grammar_note, deck_name
         )
     )
     await message.reply(text, parse_mode="HTML", reply_markup=_word_card_keyboard())
