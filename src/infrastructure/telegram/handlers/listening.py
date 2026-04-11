@@ -1,3 +1,4 @@
+import contextlib
 import os
 from html import escape
 from logging import getLogger
@@ -50,8 +51,6 @@ async def cmd_listen(
 
     # Dedup: retry once if this episode URL was already served to this user
     if await session_history_repo.has_seen(user_id, lesson.episode_url):
-        import contextlib
-
         with contextlib.suppress(Exception):
             lesson = await listening_service.prepare_lesson(profile)
 

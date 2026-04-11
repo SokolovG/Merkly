@@ -1,8 +1,10 @@
 import ipaddress
+import os
 import tempfile
 from urllib.parse import urlparse
 
 import httpx
+from pydub import AudioSegment
 
 from src.infrastructure.exceptions import InfrastructureError
 
@@ -31,12 +33,22 @@ class AudioService:
         await self._client.aclose()
 
     async def download(self, audio_url: str, duration_min: int = 5) -> str:
-        """Download first duration_min minutes of audio via Range header."""
+        """Download and trim audio to duration_min minutes using pydub."""
         _validate_audio_url(audio_url)
-        max_bytes = duration_min * 1_000_000  # ~128kbps, rough upper bound
+        # Generous byte cap: covers ~320kbps to bound download size, pydub trims precisely after
+        max_bytes = duration_min * 3_000_000
         suffix = ".m4a" if ".m4a" in audio_url else ".mp3"
         response = await self._client.get(audio_url, headers={"Range": f"bytes=0-{max_bytes}"})
         response.raise_for_status()
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(response.content)
-            return tmp.name
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as raw:
+            raw.write(response.content)
+            raw_path = raw.name
+        try:
+            audio = AudioSegment.from_file(raw_path)
+            trimmed = audio[: duration_min * 60 * 1000]  # pydub uses milliseconds
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as out:
+                out_path = out.name
+            trimmed.export(out_path, format="mp3")
+        finally:
+            os.unlink(raw_path)
+        return out_path

@@ -93,7 +93,7 @@ class AgentTools:
     async def execute(self, name: str, arguments: dict) -> str:
         logger.info("→ tool call: %s  args=%s", name, arguments)
         result = await self._dispatch(name, arguments)
-        logger.info("← tool result: %s  → %s", name, result[:120] if len(result) > 120 else result)
+        logger.info("← tool result: %s  → %s", name, result[:50] if len(result) > 200 else result)
         return result
 
     async def _dispatch(self, name: str, arguments: dict) -> str:

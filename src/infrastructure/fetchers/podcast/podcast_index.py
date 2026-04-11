@@ -4,6 +4,7 @@ import time
 
 import httpx
 
+from src.domain.constants import LANGUAGE_NAMES
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 
 logger = logging.getLogger(__name__)
@@ -30,11 +31,12 @@ class PodcastIndexFetcher(IPodcastFetcher):
         if not self._api_key or not self._api_secret:
             return None
         try:
+            lang_name = LANGUAGE_NAMES.get(language, language)
             headers = self._auth_headers()
             async with httpx.AsyncClient(timeout=15) as client:
                 search_resp = await client.get(
                     f"https://api.podcastindex.org/api/1.0/search/byterm"
-                    f"?q={language}+podcast&pretty",
+                    f"?q={lang_name}+podcast&language={language}&pretty",
                     headers=headers,
                 )
                 if search_resp.status_code != 200:

@@ -2,6 +2,7 @@ import logging
 
 import httpx
 
+from src.domain.constants import LANGUAGE_NAMES
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 
 logger = logging.getLogger(__name__)
@@ -10,9 +11,10 @@ logger = logging.getLogger(__name__)
 class ItunesPodcastFetcher(IPodcastFetcher):
     async def fetch(self, level: str, language: str) -> PodcastEpisode | None:
         try:
+            lang_name = LANGUAGE_NAMES.get(language, language)
             url = (
                 f"https://itunes.apple.com/search"
-                f"?term={language}+learn&media=podcast&entity=podcastEpisode&limit=10"
+                f"?term={lang_name}+podcast&media=podcast&entity=podcastEpisode&limit=10"
             )
             async with httpx.AsyncClient(timeout=15) as client:
                 response = await client.get(url)
