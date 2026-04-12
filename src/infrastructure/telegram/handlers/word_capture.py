@@ -77,10 +77,22 @@ async def handle_word_capture(
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     logger.info("word_capture", messenger_id=user_id)
 
+    # Try to find deck name in profile.decks first
     deck_name = next(
         (d.name for d in profile.decks if d.backend_id == profile.active_deck_id),
         None,
     )
+
+    # Fallback: query backend for users who selected deck before decks were persisted
+    if deck_name is None and profile.active_deck_id:
+        try:
+            decks = await agent._anki.list_decks()
+            deck_name = next(
+                (name for name, bid in decks if bid == profile.active_deck_id),
+                None,
+            )
+        except Exception:
+            pass
 
     await message.reply(looking_up(word), parse_mode="HTML")
 

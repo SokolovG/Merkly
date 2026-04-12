@@ -23,12 +23,12 @@ services:
       - "8001:8000"
     volumes:
       - whisper-models:/root/.cache/huggingface
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 60s
+    # healthcheck:
+    #   test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 12
+    #   start_period: 60s
 
   backend:
     build: .
@@ -36,9 +36,9 @@ services:
     env_file: .env
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_started
       whisper:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - ./src:/app/src
       - ./alembic/versions:/app/alembic/versions

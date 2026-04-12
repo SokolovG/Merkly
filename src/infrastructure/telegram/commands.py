@@ -6,6 +6,7 @@ from aiogram_dialog import setup_dialogs
 
 from src.infrastructure.telegram.dialogs.bug_report import bug_report_dialog
 from src.infrastructure.telegram.dialogs.onboarding import onboarding_dialog
+from src.infrastructure.telegram.handlers.commands import catch_all_router
 from src.infrastructure.telegram.handlers.commands import router as commands_router
 from src.infrastructure.telegram.handlers.deck_commands import deck_router
 from src.infrastructure.telegram.handlers.listening import router as listening_router
@@ -49,5 +50,6 @@ async def setup_bot(dp: Dispatcher, bot: Bot) -> None:
     dp.include_router(onboarding_dialog)
     dp.include_router(bug_report_dialog)
     setup_dialogs(dp)
+    dp.include_router(catch_all_router)  # MUST be last — catches everything not handled
 
     await bot.set_my_commands([cmd.to_bot_command() for cmd in _COMMANDS])

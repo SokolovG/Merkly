@@ -14,7 +14,6 @@ def configure_structlog(debug: bool = False) -> None:
     """
     shared_processors = [
         structlog.contextvars.merge_contextvars,
-        structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
@@ -40,4 +39,8 @@ def configure_structlog(debug: bool = False) -> None:
     # Route stdlib logging through structlog so APScheduler/aiogram logs are captured
     logging.basicConfig(format="%(message)s", level=logging.DEBUG if debug else logging.INFO)
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
-    logging.getLogger("aiogram").setLevel(logging.WARNING)
+    logging.getLogger("aiogram").setLevel(logging.ERROR)
+    logging.getLogger("aiogram_dialog").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("h11").setLevel(logging.WARNING)

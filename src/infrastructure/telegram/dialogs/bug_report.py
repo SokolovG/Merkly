@@ -5,6 +5,7 @@ from aiogram import Bot
 from aiogram.types import Message
 from aiogram_dialog import Dialog, DialogManager, Window
 from aiogram_dialog.widgets.input import MessageInput
+from aiogram_dialog.widgets.text import Const
 
 from src.config import Settings
 from src.domain.enums import MessengerType
@@ -31,7 +32,7 @@ async def on_bug_report(
     container = manager.middleware_data["dishka_container"]
     profile_repo: ProfileRepository = await container.get(ProfileRepository)
     settings: Settings = await container.get(Settings)
-    bot: Bot = await container.get(Bot)
+    bot: Bot = manager.middleware_data["bot"]
 
     if message.from_user is None or message.from_user.id is None:
         return
@@ -98,8 +99,8 @@ async def on_bug_report(
 
 bug_report_dialog = Dialog(
     Window(
+        Const(bug_report_prompt()),
         MessageInput(on_bug_report),
         state=BugSG.reporting,
-        getter=lambda **kwargs: {"text": bug_report_prompt()},
     )
 )

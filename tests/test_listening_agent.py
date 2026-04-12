@@ -11,7 +11,7 @@ from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 from src.infrastructure.exceptions import InfrastructureError
 
 _PROFILE = UserProfile(
-    telegram_id=1,
+    messenger_id=1,
     username="test",
     level="B1",
     goal=Goal.GENERAL,

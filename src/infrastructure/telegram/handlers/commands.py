@@ -5,6 +5,7 @@ from html import escape
 import structlog
 from aiogram import F, Router
 from aiogram.filters import BaseFilter, Command, CommandStart
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from aiogram_dialog import DialogManager, StartMode
 from dishka.integrations.aiogram import FromDishka
@@ -47,6 +48,7 @@ from src.infrastructure.telegram.messages import (
 from src.infrastructure.telegram.states import BugSG, OnboardingSG
 
 router = Router()
+catch_all_router = Router()  # Registered last so it doesn't intercept dialog messages
 
 logger = structlog.get_logger(__name__)
 
@@ -587,6 +589,9 @@ async def handle_delete_card(
         await callback.message.edit_reply_markup(reply_markup=None)  # type: ignore
 
 
-@router.message()
-async def handle_unknown(message: Message) -> None:
+@catch_all_router.message(F.text)
+async def handle_unknown(message: Message, state: FSMContext) -> None:
+    current_state = await state.get_state()
+    if current_state is not None:
+        return
     await message.answer(unknown_message())

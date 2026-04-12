@@ -1,5 +1,3 @@
-import logging
-
 import structlog
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -18,8 +16,6 @@ from src.infrastructure.telegram.messages import (
     deck_pick_active,
     deck_selected,
 )
-
-logger = logging.getLogger(__name__)
 
 deck_router = Router()
 

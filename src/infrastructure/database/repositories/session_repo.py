@@ -15,7 +15,7 @@ class SessionRepository(ISessionRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._db = session
 
-    def _to_domain(self, row: SessionModel, telegram_id: int) -> Session:
+    def _to_domain(self, row: SessionModel, messenger_id: int) -> Session:
         cards = [
             VocabCard(
                 word=d["word"],
@@ -29,7 +29,7 @@ class SessionRepository(ISessionRepository):
         ]
         return Session(
             session_id=row.session_id,
-            user_id=telegram_id,
+            user_id=messenger_id,
             date=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
             article_url=row.article_url,
             article_title=row.article_title,
@@ -84,4 +84,4 @@ class SessionRepository(ISessionRepository):
             .limit(limit)
         )
         rows = result.all()
-        return [self._to_domain(row, tg_id) for row, tg_id in rows]
+        return [self._to_domain(row, mid) for row, mid in rows]
