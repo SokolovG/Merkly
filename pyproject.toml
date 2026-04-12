@@ -17,6 +17,7 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "feedparser>=6.0",
     "pydub>=0.25.1",
+    "structlog>=24.0.0",
 ]
 
 [project.scripts]

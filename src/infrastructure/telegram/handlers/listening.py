@@ -3,6 +3,7 @@ import os
 from html import escape
 from logging import getLogger
 
+import structlog
 from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import BufferedInputFile, Message
@@ -29,12 +30,15 @@ async def cmd_listen(
     listening_service: FromDishka[ListeningAgent],
     session_history_repo: FromDishka[SessionHistoryRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
 
     if not profile:
         await message.answer(messages.no_profile())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     if ActivityType.LISTENING not in profile.learning_strategy:
         await message.answer(messages.listening_disabled())
@@ -90,6 +94,7 @@ async def handle_listening_answer(
     message: Message,
     agent: FromDishka[LessonAgent],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     ctx = _pending_listening.pop(user_id, None)
 

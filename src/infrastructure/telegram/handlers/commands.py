@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 from html import escape
 
+import structlog
 from aiogram import F, Router
 from aiogram.filters import BaseFilter, Command, CommandStart
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -87,9 +88,12 @@ async def cmd_start(
     dialog_manager: DialogManager,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     _pending_sessions.pop(user_id, None)
     profile = await profile_repo.get(user_id)
+    if profile:
+        structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     if profile:
         await message.answer(
@@ -108,12 +112,15 @@ async def cmd_session(
     session_history_repo: FromDishka[SessionHistoryRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
 
     if not profile:
         await message.answer(no_profile())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     if ActivityType.READING not in profile.learning_strategy:
         await message.answer(strategy_not_enabled("reading"))
@@ -189,11 +196,14 @@ async def cmd_vocab(
     pool_repo: FromDishka[VocabPoolRepository],
     refill_service: FromDishka[VocabRefillService],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
     if not profile:
         await message.answer(no_profile())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     if ActivityType.VOCAB not in profile.learning_strategy:
         await message.answer(strategy_not_enabled("vocab"))
@@ -309,11 +319,14 @@ async def cmd_repeat(
     profile_repo: FromDishka[ProfileRepository],
     pool_repo: FromDishka[VocabPoolRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
     if not profile:
         await message.answer(no_profile())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     words = await pool_repo.get_history_words(
         profile.id, str(profile.target_lang), limit=10, oldest_first=True
@@ -332,11 +345,14 @@ async def cmd_clearvocab(
     profile_repo: FromDishka[ProfileRepository],
     pool_repo: FromDishka[VocabPoolRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     profile = await profile_repo.get(user_id)
     if not profile:
         await message.answer(no_profile())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     cleared = await pool_repo.clear_pool(profile.id, str(profile.target_lang))
     if cleared:
         await message.answer(
@@ -351,7 +367,12 @@ async def cmd_help(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     profile = await profile_repo.get(message.from_user.id) if message.from_user else None
+    if profile and message.from_user:
+        structlog.contextvars.bind_contextvars(
+            user_id=str(profile.id), telegram_id=message.from_user.id
+        )
     count = profile.vocab_card_count if profile else 8
     await message.answer(help_text(count), parse_mode="HTML")
 
@@ -363,6 +384,7 @@ async def handle_answer(
     session_repo: FromDishka[SessionRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     ctx = _pending_sessions.get(user_id)
 
@@ -389,6 +411,8 @@ async def handle_answer(
 
     # Offer writing exercise only if WRITING is in the user's strategy
     profile = await profile_repo.get(user_id)
+    if profile is not None:
+        structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     writing_enabled = profile is None or ActivityType.WRITING in profile.learning_strategy
 
     if writing_enabled:

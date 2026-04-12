@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 
+import structlog
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -346,12 +347,17 @@ def _parse_value(field: str, raw: str):
 
 @settings_router.message(Command("settings"))
 async def cmd_settings(message: Message, profile_repo: FromDishka[ProfileRepository]) -> None:
+    structlog.contextvars.clear_contextvars()
     if message.from_user is None:
         return
     profile = await profile_repo.get(message.from_user.id)
     if not profile:
         await message.reply(complete_setup())
         return
+
+    structlog.contextvars.bind_contextvars(
+        user_id=str(profile.id), telegram_id=message.from_user.id
+    )
     await message.reply(
         _main_text(profile),
         parse_mode="HTML",
@@ -364,11 +370,16 @@ async def handle_nav(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     submenu = (callback.data or "").split(":", 1)[1]
     profile = await profile_repo.get(callback.from_user.id)
     if not profile:
         await callback.answer("Profile not found.")
         return
+
+    structlog.contextvars.bind_contextvars(
+        user_id=str(profile.id), telegram_id=callback.from_user.id
+    )
     text, keyboard = _submenu_content(submenu, profile)
     await callback.answer()
     if isinstance(callback.message, Message):
@@ -393,6 +404,7 @@ async def handle_pick(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     # setpick:{field}:{value}
     parts = (callback.data or "").split(":", 2)
     if len(parts) != 3:
@@ -404,6 +416,8 @@ async def handle_pick(
     if not profile:
         await callback.answer("Profile not found.")
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     try:
         value = int(raw_value)
     except ValueError:
@@ -423,12 +437,15 @@ async def handle_toggle(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     field = (callback.data or "").split(":", 1)[1]
     user_id = callback.from_user.id
     profile = await profile_repo.get(user_id)
     if not profile:
         await callback.answer("Profile not found.")
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     if field.startswith("strategy_"):
         activity_value = field[len("strategy_") :]
@@ -464,11 +481,14 @@ async def handle_sched_pickdeck(
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = callback.from_user.id
     profile = await profile_repo.get(user_id)
     if not profile:
         await callback.answer("Profile not found.")
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     try:
         decks = await card_gateway.list_decks()
     except CardBackendError:
@@ -501,6 +521,7 @@ async def handle_sched_deck_callback(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = callback.from_user.id
     decks = _waiting_deck.get(user_id)
     if not decks:
@@ -520,6 +541,8 @@ async def handle_sched_deck_callback(
     if not profile:
         await callback.answer("Profile not found.")
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     updated = _update_profile(profile, vocab_scheduler_deck_id=backend_id)
     await profile_repo.save(updated)
     await callback.answer("✅ Deck set")
@@ -536,6 +559,7 @@ async def handle_field_input(
     vocab_pool_repo: FromDishka[VocabPoolRepository],
     refill_service: FromDishka[VocabRefillService],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     if message.from_user is None or not message.text:
         return
     user_id = message.from_user.id
@@ -548,6 +572,8 @@ async def handle_field_input(
         await message.reply(complete_setup())
         _editing.pop(user_id, None)
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     parsed, error = _parse_value(field, message.text)
     if error:
         await message.reply(error, parse_mode="HTML")

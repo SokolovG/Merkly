@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Any
 
+import structlog
 from aiogram.types import CallbackQuery
 from aiogram_dialog import DialogManager
 
@@ -13,6 +14,7 @@ async def save_profile_on_confirm(
     callback: CallbackQuery, button: Any, manager: DialogManager
 ) -> None:
     """Button on_click handler for the confirm window. Saves UserProfile and closes dialog."""
+    structlog.contextvars.clear_contextvars()
     container = manager.middleware_data["dishka_container"]
     profile_repo: ProfileRepository = await container.get(ProfileRepository)
 

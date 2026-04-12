@@ -1,5 +1,6 @@
 import logging
 
+import structlog
 from aiogram import F, Router
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from dishka.integrations.aiogram import FromDishka
@@ -54,6 +55,8 @@ async def _create_deck(
     if not profile:
         await message.reply(complete_setup())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     try:
         backend_id = await card_gateway.create_deck(name)
     except CardBackendError as e:
@@ -79,6 +82,7 @@ async def handle_newdeck(
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     if message.from_user is None:
         return
     user_id = message.from_user.id
@@ -100,6 +104,7 @@ async def handle_newdeck_name(
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     if message.from_user is None or not message.text:
         return
     user_id = message.from_user.id
@@ -114,6 +119,7 @@ async def handle_setdeck(
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     if message.from_user is None:
         return
     user_id = message.from_user.id
@@ -122,6 +128,8 @@ async def handle_setdeck(
     if not profile:
         await message.reply(complete_setup())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     try:
         decks: list[tuple[str, str]] = await card_gateway.list_decks()
@@ -144,6 +152,7 @@ async def handle_setdeck_callback(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     user_id = callback.from_user.id
     decks = _pending_setdeck.get(user_id)
     if not decks:
@@ -168,6 +177,7 @@ async def handle_setdeck_callback(
         await callback.answer("Profile not found.")
         return
 
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
     updated_profile = profile.__class__(
         **{
             **{f: getattr(profile, f) for f in profile.__struct_fields__},

@@ -1,6 +1,7 @@
 import contextlib
 import logging
 
+import structlog
 from aiogram import F, Router
 from aiogram.filters import BaseFilter
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -52,6 +53,7 @@ async def handle_word_capture(
     agent: FromDishka[LessonAgent],
     profile_repo: FromDishka[ProfileRepository],
 ) -> None:
+    structlog.contextvars.clear_contextvars()
     if message.from_user is None:
         return
     user_id = message.from_user.id
@@ -72,6 +74,8 @@ async def handle_word_capture(
     if not profile:
         await message.reply(complete_setup())
         return
+
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
 
     deck_name = next(
         (d.name for d in profile.decks if d.backend_id == profile.active_deck_id),
