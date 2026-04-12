@@ -558,7 +558,7 @@ async def handle_field_input(
     if field == "level" and str(profile.level).upper().replace(" ", "") != str(
         parsed
     ).upper().replace(" ", ""):
-        cleared = await vocab_pool_repo.clear_pool(user_id, str(profile.target_lang))
+        cleared = await vocab_pool_repo.clear_pool(profile.id, str(profile.target_lang))
         if cleared:
             await message.reply(
                 f"♻️ Vocab pool cleared ({cleared} cards) — refilling at {parsed} level…"

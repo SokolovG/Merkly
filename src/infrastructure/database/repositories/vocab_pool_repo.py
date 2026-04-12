@@ -1,10 +1,11 @@
+import uuid
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import PooledVocabCard, VocabCard
 from src.domain.enums import WordType
 from src.domain.ports.vocab_pool_repo import IVocabPoolRepository
-from src.infrastructure.database.models.profile_model import ProfileModel
 from src.infrastructure.database.models.vocab_history_model import VocabHistoryModel
 from src.infrastructure.database.models.vocab_pool_model import VocabPoolModel
 
@@ -13,30 +14,22 @@ class VocabPoolRepository(IVocabPoolRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._db = session
 
-    async def _resolve_profile_id(self, telegram_id: int) -> int:
-        result = await self._db.execute(
-            select(ProfileModel.id).where(ProfileModel.telegram_id == telegram_id)
-        )
-        return result.scalar_one()
-
-    async def pool_count(self, user_id: int, target_lang: str) -> int:
-        profile_id = await self._resolve_profile_id(user_id)
+    async def pool_count(self, user_id: uuid.UUID, target_lang: str) -> int:
         result = await self._db.execute(
             select(func.count()).where(
-                VocabPoolModel.user_id == profile_id,
+                VocabPoolModel.user_id == user_id,
                 VocabPoolModel.target_lang == target_lang,
             )
         )
         return result.scalar_one()
 
     async def get_pool_cards(
-        self, user_id: int, target_lang: str, count: int
+        self, user_id: uuid.UUID, target_lang: str, count: int
     ) -> list[PooledVocabCard]:
-        profile_id = await self._resolve_profile_id(user_id)
         result = await self._db.execute(
             select(VocabPoolModel)
             .where(
-                VocabPoolModel.user_id == profile_id,
+                VocabPoolModel.user_id == user_id,
                 VocabPoolModel.target_lang == target_lang,
             )
             .order_by(VocabPoolModel.created_at.asc())
@@ -56,13 +49,13 @@ class VocabPoolRepository(IVocabPoolRepository):
             for row in rows
         ]
 
-    async def add_to_pool(self, user_id: int, cards: list[VocabCard], target_lang: str) -> None:
-        profile_id = await self._resolve_profile_id(user_id)
-
+    async def add_to_pool(
+        self, user_id: uuid.UUID, cards: list[VocabCard], target_lang: str
+    ) -> None:
         # Fetch existing history words for dedup
         result = await self._db.execute(
             select(VocabHistoryModel.word).where(
-                VocabHistoryModel.user_id == profile_id,
+                VocabHistoryModel.user_id == user_id,
                 VocabHistoryModel.target_lang == target_lang,
             )
         )
@@ -70,7 +63,7 @@ class VocabPoolRepository(IVocabPoolRepository):
 
         new_rows = [
             VocabPoolModel(
-                user_id=profile_id,
+                user_id=user_id,
                 target_lang=target_lang,
                 word=card.word,
                 translation=card.translation,
@@ -85,9 +78,7 @@ class VocabPoolRepository(IVocabPoolRepository):
             self._db.add_all(new_rows)
             await self._db.commit()
 
-    async def mark_shown(self, user_id: int, card_ids: list[int]) -> None:
-        profile_id = await self._resolve_profile_id(user_id)
-
+    async def mark_shown(self, user_id: uuid.UUID, card_ids: list[uuid.UUID]) -> None:
         # Fetch words before deleting
         result = await self._db.execute(
             select(VocabPoolModel.word, VocabPoolModel.target_lang).where(
@@ -102,7 +93,7 @@ class VocabPoolRepository(IVocabPoolRepository):
         # Insert into history
         history_rows = [
             VocabHistoryModel(
-                user_id=profile_id,
+                user_id=user_id,
                 target_lang=target_lang,
                 word=word,
             )
@@ -113,18 +104,17 @@ class VocabPoolRepository(IVocabPoolRepository):
 
         await self._db.commit()
 
-    async def clear_pool(self, user_id: int, target_lang: str) -> int:
-        profile_id = await self._resolve_profile_id(user_id)
+    async def clear_pool(self, user_id: uuid.UUID, target_lang: str) -> int:
         count_result = await self._db.execute(
             select(func.count()).where(
-                VocabPoolModel.user_id == profile_id,
+                VocabPoolModel.user_id == user_id,
                 VocabPoolModel.target_lang == target_lang,
             )
         )
         count: int = count_result.scalar_one()
         await self._db.execute(
             delete(VocabPoolModel).where(
-                VocabPoolModel.user_id == profile_id,
+                VocabPoolModel.user_id == user_id,
                 VocabPoolModel.target_lang == target_lang,
             )
         )
@@ -132,9 +122,8 @@ class VocabPoolRepository(IVocabPoolRepository):
         return count
 
     async def get_history_words(
-        self, user_id: int, target_lang: str, limit: int, oldest_first: bool = False
+        self, user_id: uuid.UUID, target_lang: str, limit: int, oldest_first: bool = False
     ) -> list[str]:
-        profile_id = await self._resolve_profile_id(user_id)
         order = (
             VocabHistoryModel.created_at.asc()
             if oldest_first
@@ -143,7 +132,7 @@ class VocabPoolRepository(IVocabPoolRepository):
         result = await self._db.execute(
             select(VocabHistoryModel.word)
             .where(
-                VocabHistoryModel.user_id == profile_id,
+                VocabHistoryModel.user_id == user_id,
                 VocabHistoryModel.target_lang == target_lang,
             )
             .order_by(order)

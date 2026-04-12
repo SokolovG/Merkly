@@ -1,3 +1,5 @@
+import uuid
+
 import msgspec
 
 from src.domain.constants import DEFAULT_EPISODE_DURATION_MIN, DEFAULT_QUESTION_COUNT
@@ -40,6 +42,9 @@ class UserProfile(msgspec.Struct):
             ActivityType.VOCAB,
         ]
     )
+    id: uuid.UUID = msgspec.field(
+        default_factory=uuid.uuid4
+    )  # Internal UUID — generated on construction, persisted on first save
 
 
 class VocabCard(msgspec.Struct):
@@ -53,7 +58,7 @@ class VocabCard(msgspec.Struct):
 
 
 class PooledVocabCard(msgspec.Struct):
-    id: int  # DB primary key — required for mark_shown
+    id: uuid.UUID  # DB primary key — required for mark_shown
     word: str
     translation: str
     example_sentence: str

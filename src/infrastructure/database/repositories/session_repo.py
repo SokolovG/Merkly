@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,10 +41,10 @@ class SessionRepository(ISessionRepository):
             duration_seconds=row.duration_seconds,
         )
 
-    def _to_values(self, session: Session, profile_id: int) -> dict:
+    def _to_values(self, session: Session, user_id: uuid.UUID) -> dict:
         return {
             "session_id": session.session_id,
-            "user_id": profile_id,
+            "user_id": user_id,
             "article_url": session.article_url,
             "article_title": session.article_title,
             "article_text": session.article_text,
@@ -63,13 +65,8 @@ class SessionRepository(ISessionRepository):
             "duration_seconds": session.duration_seconds,
         }
 
-    async def save(self, session: Session) -> None:
-        result = await self._db.execute(
-            select(ProfileModel.id).where(ProfileModel.telegram_id == session.user_id)
-        )
-        profile_id = result.scalar_one()
-
-        values = self._to_values(session, profile_id)
+    async def save(self, session: Session, user_id: uuid.UUID) -> None:
+        values = self._to_values(session, user_id)
         stmt = pg_insert(SessionModel).values(**values)
         stmt = stmt.on_conflict_do_update(
             index_elements=["session_id"],
@@ -78,11 +75,11 @@ class SessionRepository(ISessionRepository):
         await self._db.execute(stmt)
         await self._db.commit()
 
-    async def get_recent(self, user_id: int, limit: int = 3) -> list[Session]:
+    async def get_recent(self, user_id: uuid.UUID, limit: int = 3) -> list[Session]:
         result = await self._db.execute(
             select(SessionModel, ProfileModel.telegram_id)
             .join(ProfileModel, SessionModel.user_id == ProfileModel.id)
-            .where(ProfileModel.telegram_id == user_id)
+            .where(ProfileModel.id == user_id)
             .order_by(SessionModel.created_at.desc())
             .limit(limit)
         )

@@ -64,13 +64,13 @@ async def send_scheduled_vocab(
             async with session_factory() as session:
                 pool_repo = VocabPoolRepository(session)
                 pool_cards = await pool_repo.get_pool_cards(
-                    profile.telegram_id, str(profile.target_lang), profile.vocab_card_count
+                    profile.id, str(profile.target_lang), profile.vocab_card_count
                 )
                 if not pool_cards:
                     refill_service = VocabRefillService(agent=agent, repo=pool_repo)
                     await refill_service._refill(profile)
                     pool_cards = await pool_repo.get_pool_cards(
-                        profile.telegram_id, str(profile.target_lang), profile.vocab_card_count
+                        profile.id, str(profile.target_lang), profile.vocab_card_count
                     )
                 if not pool_cards:
                     continue
@@ -88,7 +88,7 @@ async def send_scheduled_vocab(
                 deck_id = profile.vocab_scheduler_deck_id or profile.active_deck_id or None
                 for vc in vocab_cards:
                     await agent._anki.create_card(vc, deck_id=deck_id)
-                await pool_repo.mark_shown(profile.telegram_id, [pc.id for pc in pool_cards])
+                await pool_repo.mark_shown(profile.id, [pc.id for pc in pool_cards])
 
             card_list = "\n".join(
                 f"• <b>{escape(c.word)}</b> — {escape(c.translation)}" for c in vocab_cards

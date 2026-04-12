@@ -37,6 +37,7 @@ class ProfileRepository(IProfileRepository):
             ],
             question_count=row.question_count,
             episode_duration_min=row.episode_duration_min,
+            id=row.id,
         )
 
     def _to_values(self, profile: UserProfile) -> dict:
@@ -69,11 +70,11 @@ class ProfileRepository(IProfileRepository):
         return self._to_domain(row) if row else None
 
     async def save(self, profile: UserProfile) -> None:
-        values = self._to_values(profile)
+        values = {**self._to_values(profile), "id": profile.id}
         stmt = pg_insert(ProfileModel).values(**values)
         stmt = stmt.on_conflict_do_update(
             index_elements=["telegram_id"],
-            set_={k: stmt.excluded[k] for k in values if k != "telegram_id"},
+            set_={k: stmt.excluded[k] for k in values if k not in ("telegram_id", "id")},
         )
         await self._session.execute(stmt)
         await self._session.commit()

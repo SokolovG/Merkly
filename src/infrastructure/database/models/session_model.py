@@ -1,4 +1,6 @@
-from sqlalchemy import BigInteger, ForeignKey, Integer, Text
+import uuid
+
+from sqlalchemy import UUID, ForeignKey, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,8 +11,8 @@ class SessionModel(Base):
     __tablename__ = "sessions"
 
     session_id: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
-    user_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
     )
     article_url: Mapped[str] = mapped_column(Text, nullable=False)
     article_title: Mapped[str] = mapped_column(Text, nullable=False)

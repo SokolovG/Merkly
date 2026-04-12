@@ -122,7 +122,7 @@ async def cmd_session(
     await message.answer(preparing_lesson())
 
     # Get recent session topics to avoid repetition
-    recent = await session_repo.get_recent(user_id, limit=3)
+    recent = await session_repo.get_recent(profile.id, limit=3)
     recent_topics = [s.article_title for s in recent]
 
     try:
@@ -139,7 +139,7 @@ async def cmd_session(
         return
 
     # Dedup: retry once if this article URL was already served to this user
-    if await session_history_repo.has_seen(user_id, url):
+    if await session_history_repo.has_seen(profile.id, url):
         import contextlib
 
         with contextlib.suppress(Exception):
@@ -167,7 +167,7 @@ async def cmd_session(
     article_msg += f"\nSend your answers as one message (answer all {len(questions)})."
 
     await message.answer(article_msg, parse_mode="HTML")
-    await session_history_repo.record(user_id, url, ActivityType.READING)
+    await session_history_repo.record(profile.id, url, ActivityType.READING)
 
     _pending_sessions[user_id] = {
         "session_id": session_id,
@@ -253,7 +253,7 @@ async def cmd_vocab(
 
     # Normal path: serve from pool
     target_lang = str(profile.target_lang)
-    pool_cards = await pool_repo.get_pool_cards(user_id, target_lang, count)
+    pool_cards = await pool_repo.get_pool_cards(profile.id, target_lang, count)
 
     # On-miss fallback: trigger synchronous refill and retry once
     if not pool_cards:
@@ -262,7 +262,7 @@ async def cmd_vocab(
         except Exception as e:
             await message.answer(vocab_failed(str(e)))
             return
-        pool_cards = await pool_repo.get_pool_cards(user_id, target_lang, count)
+        pool_cards = await pool_repo.get_pool_cards(profile.id, target_lang, count)
 
     if not pool_cards:
         await message.answer(vocab_empty())
@@ -297,7 +297,7 @@ async def cmd_vocab(
     await message.answer(response, parse_mode="HTML", reply_markup=_cards_keyboard(vocab_cards))
 
     # Mark served cards as shown (moves to history, removes from pool)
-    await pool_repo.mark_shown(user_id, [pc.id for pc in pool_cards])
+    await pool_repo.mark_shown(profile.id, [pc.id for pc in pool_cards])
 
     # Eager refill: top up pool if below threshold (runs after response sent)
     await refill_service.refill_if_needed(profile)
@@ -316,7 +316,7 @@ async def cmd_repeat(
         return
 
     words = await pool_repo.get_history_words(
-        user_id, str(profile.target_lang), limit=10, oldest_first=True
+        profile.id, str(profile.target_lang), limit=10, oldest_first=True
     )
     if not words:
         await message.answer(repeat_empty())
@@ -337,7 +337,7 @@ async def cmd_clearvocab(
     if not profile:
         await message.answer(no_profile())
         return
-    cleared = await pool_repo.clear_pool(user_id, str(profile.target_lang))
+    cleared = await pool_repo.clear_pool(profile.id, str(profile.target_lang))
     if cleared:
         await message.answer(
             f"♻️ Vocab pool cleared ({cleared} cards). Next /vocab will refill with fresh words."
@@ -430,7 +430,8 @@ async def handle_answer(
         feedback=feedback,
         cards_created=[],
     )
-    await session_repo.save(session)
+    if profile is not None:
+        await session_repo.save(session, profile.id)
 
 
 @router.callback_query(F.data.startswith(f"{_CB_WRITING}:"))

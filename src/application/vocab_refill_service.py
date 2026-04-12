@@ -15,7 +15,7 @@ class VocabRefillService:
 
     async def refill_if_needed(self, profile: UserProfile) -> bool:
         """Refill pool if below threshold. Returns True if refill was triggered."""
-        count = await self._repo.pool_count(profile.telegram_id, str(profile.target_lang))
+        count = await self._repo.pool_count(profile.id, str(profile.target_lang))
         if count >= POOL_THRESHOLD:
             return False
         await self._refill(profile)
@@ -23,13 +23,13 @@ class VocabRefillService:
 
     async def _refill(self, profile: UserProfile) -> None:
         hint_words = await self._repo.get_history_words(
-            profile.telegram_id,
+            profile.id,
             str(profile.target_lang),
             limit=POOL_RECENT_HINT,
         )
         logger.info(
-            "Refilling vocab pool for user=%d lang=%s hint_count=%d",
-            profile.telegram_id,
+            "Refilling vocab pool for user=%s lang=%s hint_count=%d",
+            profile.id,
             profile.target_lang,
             len(hint_words),
         )
@@ -42,10 +42,10 @@ class VocabRefillService:
             count=POOL_FILL_SIZE,
             pool_mode=True,
         )
-        await self._repo.add_to_pool(profile.telegram_id, cards, str(profile.target_lang))
+        await self._repo.add_to_pool(profile.id, cards, str(profile.target_lang))
         logger.info(
-            "Pool refill complete for user=%d lang=%s cards_added=%d",
-            profile.telegram_id,
+            "Pool refill complete for user=%s lang=%s cards_added=%d",
+            profile.id,
             profile.target_lang,
             len(cards),
         )

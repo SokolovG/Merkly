@@ -50,7 +50,7 @@ async def cmd_listen(
         return
 
     # Dedup: retry once if this episode URL was already served to this user
-    if await session_history_repo.has_seen(user_id, lesson.episode_url):
+    if await session_history_repo.has_seen(profile.id, lesson.episode_url):
         with contextlib.suppress(Exception):
             lesson = await listening_service.prepare_lesson(profile)
 
@@ -63,7 +63,7 @@ async def cmd_listen(
     finally:
         os.unlink(lesson.audio_path)
 
-    await session_history_repo.record(user_id, lesson.episode_url, ActivityType.LISTENING)
+    await session_history_repo.record(profile.id, lesson.episode_url, ActivityType.LISTENING)
     await message.answer(messages.listening_transcribing())
 
     _pending_listening[user_id] = {

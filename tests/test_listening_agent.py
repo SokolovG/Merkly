@@ -17,7 +17,6 @@ _PROFILE = UserProfile(
     goal=Goal.GENERAL,
     native_lang=Language.EN,
     target_lang=Language.DE,
-    session_minutes=10,
     episode_duration_min=3,
     question_count=3,
 )
