@@ -56,7 +56,7 @@ async def _create_deck(
         await message.reply(complete_setup())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     try:
         backend_id = await card_gateway.create_deck(name)
     except CardBackendError as e:
@@ -129,7 +129,7 @@ async def handle_setdeck(
         await message.reply(complete_setup())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
 
     try:
         decks: list[tuple[str, str]] = await card_gateway.list_decks()
@@ -177,7 +177,7 @@ async def handle_setdeck_callback(
         await callback.answer("Profile not found.")
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
 
     # Ensure the selected deck is in profile.decks so name lookup works in +word
     existing_ids = {d.backend_id for d in profile.decks}

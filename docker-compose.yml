@@ -23,6 +23,12 @@ services:
       - "8001:8000"
     volumes:
       - whisper-models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
 
   backend:
     build: .
@@ -32,7 +38,7 @@ services:
       db:
         condition: service_healthy
       whisper:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ./src:/app/src
       - ./alembic/versions:/app/alembic/versions

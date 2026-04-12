@@ -356,7 +356,7 @@ async def cmd_settings(message: Message, profile_repo: FromDishka[ProfileReposit
         return
 
     structlog.contextvars.bind_contextvars(
-        user_id=str(profile.id), telegram_id=message.from_user.id
+        user_id=str(profile.id), messenger_id=message.from_user.id
     )
     await message.reply(
         _main_text(profile),
@@ -378,7 +378,7 @@ async def handle_nav(
         return
 
     structlog.contextvars.bind_contextvars(
-        user_id=str(profile.id), telegram_id=callback.from_user.id
+        user_id=str(profile.id), messenger_id=callback.from_user.id
     )
     text, keyboard = _submenu_content(submenu, profile)
     await callback.answer()
@@ -417,7 +417,7 @@ async def handle_pick(
         await callback.answer("Profile not found.")
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     try:
         value = int(raw_value)
     except ValueError:
@@ -445,7 +445,7 @@ async def handle_toggle(
         await callback.answer("Profile not found.")
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
 
     if field.startswith("strategy_"):
         activity_value = field[len("strategy_") :]
@@ -488,7 +488,7 @@ async def handle_sched_pickdeck(
         await callback.answer("Profile not found.")
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     try:
         decks = await card_gateway.list_decks()
     except CardBackendError:
@@ -542,7 +542,7 @@ async def handle_sched_deck_callback(
         await callback.answer("Profile not found.")
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     updated = _update_profile(profile, vocab_scheduler_deck_id=backend_id)
     await profile_repo.save(updated)
     await callback.answer("✅ Deck set")
@@ -573,7 +573,7 @@ async def handle_field_input(
         _editing.pop(user_id, None)
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     parsed, error = _parse_value(field, message.text)
     if error:
         await message.reply(error, parse_mode="HTML")

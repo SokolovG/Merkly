@@ -274,6 +274,8 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "/settings — Update your profile (language, level, goal, card count)\n"
         "/newdeck &lt;name&gt; — Create a new deck in Anki/Mochi and set it as active\n"
         "/setdeck — Pick your active deck from existing ones\n"
+        "/bug — Report a bug\n"
+        "/exit — Cancel active session\n"
         "/help — Show this message\n\n"
         "📖 How a session works:\n"
         "1. Bot fetches an article in your target language\n"
@@ -293,3 +295,40 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "   Cards go to your active deck (/setdeck to change)\n\n"
         "🃏 Cards can be deleted with the buttons below each card list."
     )
+
+
+# --- Bug report ---
+
+
+def bug_report_sent() -> str:
+    return "✅ Report sent. Thank you!"
+
+
+def bug_report_prompt() -> str:
+    return "🐛 Describe the bug (text, photo, video, or PDF):"
+
+
+def bug_report_unsupported_file() -> str:
+    return "❌ Unsupported file type. Please send text, photo, video, or PDF."
+
+
+# --- Unknown message ---
+
+
+def unknown_message() -> str:
+    return (
+        "I didn't understand that.\n\n"
+        "Available commands:\n"
+        "/session — reading lesson\n"
+        "/listen — listening lesson\n"
+        "/vocab — vocabulary cards\n"
+        "/repeat — review past words\n"
+        "/settings — preferences\n"
+        "/bug — report a bug\n"
+        "/exit — cancel active session\n"
+        "/help — full help"
+    )
+
+
+def session_cancelled() -> str:
+    return "Session cancelled. Use /session, /vocab, or /listen to start a new one."

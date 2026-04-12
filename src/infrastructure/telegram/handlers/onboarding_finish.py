@@ -22,7 +22,7 @@ async def save_profile_on_confirm(
     user = callback.from_user
 
     profile = UserProfile(
-        telegram_id=user.id,
+        messenger_id=user.id,
         username=user.username,
         level=data.get("level", "B1"),
         goal=data.get("goal", "general"),

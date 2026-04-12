@@ -36,7 +36,7 @@ async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
                 flag = LANGUAGE_FLAGS.get(profile.target_lang, "🌍")
                 name = lang_name(profile.target_lang)
                 await bot.send_message(
-                    chat_id=profile.telegram_id,
+                    chat_id=profile.messenger_id,
                     text=(
                         f"Hey! {flag}\n\n"
                         f"Time for your daily {name} practice.\n"
@@ -103,7 +103,7 @@ async def send_scheduled_vocab(
                 f"• <b>{escape(c.word)}</b> — {escape(c.translation)}" for c in vocab_cards
             )
             await bot.send_message(
-                chat_id=profile.telegram_id,
+                chat_id=profile.messenger_id,
                 text=f"🃏 <b>Daily vocab</b>\n\n{card_list}",
                 parse_mode="HTML",
             )

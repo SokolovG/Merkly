@@ -74,8 +74,8 @@ async def handle_word_capture(
         await message.reply(complete_setup())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-    logger.info("word_capture", telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+    logger.info("word_capture", messenger_id=user_id)
 
     deck_name = next(
         (d.name for d in profile.decks if d.backend_id == profile.active_deck_id),

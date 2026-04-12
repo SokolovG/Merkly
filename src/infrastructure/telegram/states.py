@@ -21,3 +21,7 @@ class SessionSG(StatesGroup):
     answering_3 = State()
     reviewing = State()  # agent is reviewing
     done = State()
+
+
+class BugSG(StatesGroup):
+    reporting = State()

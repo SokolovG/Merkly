@@ -4,6 +4,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.types import BotCommand
 from aiogram_dialog import setup_dialogs
 
+from src.infrastructure.telegram.dialogs.bug_report import bug_report_dialog
 from src.infrastructure.telegram.dialogs.onboarding import onboarding_dialog
 from src.infrastructure.telegram.handlers.commands import router as commands_router
 from src.infrastructure.telegram.handlers.deck_commands import deck_router
@@ -31,6 +32,8 @@ _COMMANDS = [
     _Cmd("settings", "Update your profile and scheduler"),
     _Cmd("newdeck", "Create a new deck in Anki/Mochi"),
     _Cmd("setdeck", "Pick your active deck"),
+    _Cmd("bug", "Report a bug"),
+    _Cmd("exit", "Cancel active session"),
     _Cmd("help", "Show available commands"),
 ]
 
@@ -44,6 +47,7 @@ async def setup_bot(dp: Dispatcher, bot: Bot) -> None:
     dp.include_router(listening_router)
     dp.include_router(commands_router)
     dp.include_router(onboarding_dialog)
+    dp.include_router(bug_report_dialog)
     setup_dialogs(dp)
 
     await bot.set_my_commands([cmd.to_bot_command() for cmd in _COMMANDS])

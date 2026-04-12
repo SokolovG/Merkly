@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     DB_PASSWORD: str
     DEBUG: bool = False
 
+    # Bug reports
+    BUG_REPORT_CHAT_ID: str = ""  # empty = disabled, fall back to GitHub URL
+    GITHUB_REPO_URL: str = ""  # e.g. https://github.com/SokolovG/merkly
+
     @property
     def async_database_url(self) -> str:
         """An asynchronous URL for the app to run."""

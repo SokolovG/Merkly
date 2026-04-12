@@ -37,8 +37,8 @@ async def cmd_listen(
         await message.answer(messages.no_profile())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-    logger.info("cmd_listen", telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+    logger.info("cmd_listen", messenger_id=user_id)
 
     if ActivityType.LISTENING not in profile.learning_strategy:
         await message.answer(messages.listening_disabled())

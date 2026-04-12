@@ -105,3 +105,7 @@ class ActivityType(StrEnum):
     WRITING = "writing"
     LISTENING = "listening"
     VOCAB = "vocab"
+
+
+class MessengerType(StrEnum):
+    TELEGRAM = "telegram"

@@ -8,7 +8,8 @@ from src.infrastructure.database.models.base import Base
 class ProfileModel(Base):
     __tablename__ = "profiles"
 
-    telegram_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    messenger_id: Mapped[int] = mapped_column(BigInteger, unique=True, nullable=False)
+    messenger_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="telegram")
     username: Mapped[str | None] = mapped_column(Text, nullable=True)
     level: Mapped[str] = mapped_column(Text, nullable=False)
     goal: Mapped[str] = mapped_column(Text, nullable=False)

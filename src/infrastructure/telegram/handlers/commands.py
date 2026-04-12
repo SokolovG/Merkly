@@ -34,15 +34,17 @@ from src.infrastructure.telegram.messages import (
     repeat_header,
     reviewing_answers,
     reviewing_writing,
+    session_cancelled,
     session_expired,
     strategy_not_enabled,
+    unknown_message,
     vocab_empty,
     vocab_failed,
     vocab_header,
     welcome_back,
     writing_cards_header,
 )
-from src.infrastructure.telegram.states import OnboardingSG
+from src.infrastructure.telegram.states import BugSG, OnboardingSG
 
 router = Router()
 
@@ -99,8 +101,8 @@ async def cmd_start(
     _pending_sessions.pop(user_id, None)
     profile = await profile_repo.get(user_id)
     if profile:
-        structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-        logger.info("cmd_start", telegram_id=user_id)
+        structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+        logger.info("cmd_start", messenger_id=user_id)
 
     if profile:
         await message.answer(
@@ -127,8 +129,8 @@ async def cmd_session(
         await message.answer(no_profile())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-    logger.info("cmd_session", telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+    logger.info("cmd_session", messenger_id=user_id)
 
     if ActivityType.READING not in profile.learning_strategy:
         await message.answer(strategy_not_enabled("reading"))
@@ -211,7 +213,7 @@ async def cmd_vocab(
         await message.answer(no_profile())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
 
     if ActivityType.VOCAB not in profile.learning_strategy:
         await message.answer(strategy_not_enabled("vocab"))
@@ -243,7 +245,7 @@ async def cmd_vocab(
             else:
                 force_topic = args_str
 
-    logger.info("cmd_vocab", telegram_id=user_id, force_topic=force_topic, count=count)
+    logger.info("cmd_vocab", messenger_id=user_id, force_topic=force_topic, count=count)
 
     await message.answer(fetching_vocab())
 
@@ -336,8 +338,8 @@ async def cmd_repeat(
         await message.answer(no_profile())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-    logger.info("cmd_repeat", telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+    logger.info("cmd_repeat", messenger_id=user_id)
 
     words = await pool_repo.get_history_words(
         profile.id, str(profile.target_lang), limit=10, oldest_first=True
@@ -363,8 +365,8 @@ async def cmd_clearvocab(
         await message.answer(no_profile())
         return
 
-    structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-    logger.info("cmd_clearvocab", telegram_id=user_id)
+    structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+    logger.info("cmd_clearvocab", messenger_id=user_id)
     cleared = await pool_repo.clear_pool(profile.id, str(profile.target_lang))
     if cleared:
         await message.answer(
@@ -383,11 +385,28 @@ async def cmd_help(
     profile = await profile_repo.get(message.from_user.id) if message.from_user else None
     if profile and message.from_user:
         structlog.contextvars.bind_contextvars(
-            user_id=str(profile.id), telegram_id=message.from_user.id
+            user_id=str(profile.id), messenger_id=message.from_user.id
         )
-        logger.info("cmd_help", telegram_id=message.from_user.id)
+        logger.info("cmd_help", messenger_id=message.from_user.id)
     count = profile.vocab_card_count if profile else 8
     await message.answer(help_text(count), parse_mode="HTML")
+
+
+@router.message(Command("bug"))
+async def cmd_bug(message: Message, dialog_manager: DialogManager) -> None:
+    await dialog_manager.start(BugSG.reporting, mode=StartMode.RESET_STACK)
+
+
+@router.message(Command("exit"))
+async def cmd_exit(message: Message) -> None:
+    user_id = message.from_user.id  # type: ignore
+    _pending_sessions.pop(user_id, None)
+    _pending_writing.pop(user_id, None)
+    # Import _pending_listening from listening module
+    from src.infrastructure.telegram.handlers.listening import _pending_listening
+
+    _pending_listening.pop(user_id, None)
+    await message.answer(session_cancelled())
 
 
 @router.message(_HasPendingSession())
@@ -425,8 +444,8 @@ async def handle_answer(
     # Offer writing exercise only if WRITING is in the user's strategy
     profile = await profile_repo.get(user_id)
     if profile is not None:
-        structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
-    logger.info("answer_received", telegram_id=user_id)
+        structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
+    logger.info("answer_received", messenger_id=user_id)
     writing_enabled = profile is None or ActivityType.WRITING in profile.learning_strategy
 
     if writing_enabled:
@@ -566,3 +585,8 @@ async def handle_delete_card(
         await callback.message.edit_reply_markup(reply_markup=_cards_keyboard(cards))  # type: ignore
     else:
         await callback.message.edit_reply_markup(reply_markup=None)  # type: ignore
+
+
+@router.message()
+async def handle_unknown(message: Message) -> None:
+    await message.answer(unknown_message())

@@ -77,7 +77,7 @@ class SessionRepository(ISessionRepository):
 
     async def get_recent(self, user_id: uuid.UUID, limit: int = 3) -> list[Session]:
         result = await self._db.execute(
-            select(SessionModel, ProfileModel.telegram_id)
+            select(SessionModel, ProfileModel.messenger_id)
             .join(ProfileModel, SessionModel.user_id == ProfileModel.id)
             .where(ProfileModel.id == user_id)
             .order_by(SessionModel.created_at.desc())
