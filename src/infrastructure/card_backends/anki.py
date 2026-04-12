@@ -1,8 +1,11 @@
 import httpx
+import structlog
 
 from src.domain.entities import VocabCard
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.exceptions import CardBackendError
+
+logger = structlog.get_logger(__name__)
 
 
 class AnkiClient(ICardGateway):
@@ -39,15 +42,19 @@ class AnkiClient(ICardGateway):
             },
         }
         try:
+            logger.info("card_create_attempt", integration="anki", deck=deck_id or self._deck)
             resp = await self._client.post(self._url, json=payload)
             result = resp.json()
             if result.get("error"):
                 raise CardBackendError(f"Anki error: {result['error']}")
             note_id = result.get("result")
+            if note_id:
+                logger.info("card_created", integration="anki", card_id=str(note_id))
             return str(note_id) if note_id else None
         except CardBackendError:
             raise
         except Exception as exc:
+            logger.warning("card_create_failed", integration="anki", error=str(exc))
             raise CardBackendError(f"Anki request failed: {exc}") from exc
 
     async def create_deck(self, name: str) -> str:

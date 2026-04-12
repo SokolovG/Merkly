@@ -1,12 +1,11 @@
-import logging
-
 import httpx
+import structlog
 
 from src.domain.entities import VocabCard
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.exceptions import CardBackendError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class MochiClient(ICardGateway):
@@ -67,14 +66,18 @@ class MochiClient(ICardGateway):
             "fields": fields,
         }
         try:
+            logger.info("card_create_attempt", integration="mochi", deck=deck_id or self._deck_id)
             resp = await self._client.post("/cards/", json=payload)
             if resp.status_code in (200, 201):
                 card_id = resp.json().get("id")
+                if card_id:
+                    logger.info("card_created", integration="mochi", card_id=card_id)
                 return card_id
             raise CardBackendError(f"Mochi {resp.status_code}: {resp.text[:200]}")
         except CardBackendError:
             raise
         except Exception as exc:
+            logger.warning("card_create_failed", integration="mochi", error=str(exc))
             raise CardBackendError(f"Mochi request failed: {exc}") from exc
 
     async def create_deck(self, name: str) -> str:

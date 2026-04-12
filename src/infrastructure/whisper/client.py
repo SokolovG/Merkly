@@ -1,11 +1,12 @@
 import os
-from logging import getLogger
+import time
 
 import httpx
+import structlog
 
 from src.infrastructure.exceptions import InfrastructureError
 
-logger = getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _MIME_BY_SUFFIX = {
     ".m4a": "audio/mp4",
@@ -28,6 +29,8 @@ class WhisperClient:
         _, suffix = os.path.splitext(audio_path)
         mime_type = _MIME_BY_SUFFIX.get(suffix.lower(), "audio/mpeg")
         filename = os.path.basename(audio_path)
+        logger.info("transcribe_start", integration="whisper", file=filename)
+        t0 = time.monotonic()
         with open(audio_path, "rb") as f:
             response = await self._client.post(
                 f"{self._base_url}/v1/audio/transcriptions",
@@ -35,5 +38,8 @@ class WhisperClient:
                 data={"model": "base"},
             )
         if response.status_code != 200:
+            logger.warning("transcribe_failed", integration="whisper", status=response.status_code)
             raise InfrastructureError(f"Whisper transcription failed: {response.text}")
+        latency_ms = round((time.monotonic() - t0) * 1000)
+        logger.info("transcribe_complete", integration="whisper", latency_ms=latency_ms)
         return response.json()["text"]

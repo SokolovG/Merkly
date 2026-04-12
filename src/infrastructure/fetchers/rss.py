@@ -1,15 +1,15 @@
-import logging
 import random
 import re
 import xml.etree.ElementTree as ET
 
 import httpx
+import structlog
 
 from src.domain.ports.article_fetcher import Article, IArticleFetcher
 from src.infrastructure.decorators import retry
 from src.infrastructure.exceptions import FetcherError
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Default RSS sources per language — agent can override with source_url
 _DEFAULT_SOURCES: dict[str, list[str]] = {
@@ -76,6 +76,12 @@ class NewsArticleFetcher(IArticleFetcher):
 
         items = _parse_rss_items(resp.text)
         if not items:
+            logger.warning(
+                "article_fetch_failed",
+                integration="dw_rss",
+                feed_url=feed_url,
+                error="No items found in feed",
+            )
             raise FetcherError(f"No items found in RSS feed: {feed_url}")
 
         item = random.choice(items[:10])
@@ -92,9 +98,19 @@ class NewsArticleFetcher(IArticleFetcher):
             text = await self._fetch_page_text(link) or text
 
         if len(text.split()) < 20:
+            logger.warning(
+                "article_fetch_failed",
+                integration="dw_rss",
+                feed_url=feed_url,
+                error="Article text too short",
+            )
             raise FetcherError(f"Article text too short from {feed_url}")
 
-        return Article(url=link or feed_url, title=title, text=_truncate(text), level=level)
+        article = Article(url=link or feed_url, title=title, text=_truncate(text), level=level)
+        logger.info(
+            "article_fetched", integration="dw_rss", url=article.url, title=article.title[:80]
+        )
+        return article
 
     async def _fetch_page_text(self, url: str) -> str | None:
         import json

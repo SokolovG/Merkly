@@ -1,9 +1,13 @@
 import json
+import time
 
 import openai
+import structlog
 
 from src.domain.ports.llm_gateway import ILLMGateway, LLMResponse, Message, ToolCall
 from src.infrastructure.exceptions import LLMError
+
+logger = structlog.get_logger(__name__)
 
 
 class LLMClient:
@@ -38,13 +42,27 @@ class LLMClient:
             kwargs["tool_choice"] = "auto"
 
         try:
+            prompt_tokens_estimate = sum(len(m.content or "") for m in messages) // 4
+            logger.info(
+                "llm_request",
+                integration="openai",
+                model=self._model,
+                prompt_tokens=prompt_tokens_estimate,
+            )
+            t0 = time.monotonic()
             response = await self._client.chat.completions.create(**kwargs)
         except openai.APITimeoutError as exc:
+            logger.warning("llm_error", integration="openai", error=str(exc))
             raise LLMError(f"LLM request timed out: {exc}") from exc
         except openai.APIStatusError as exc:
+            logger.warning("llm_error", integration="openai", error=str(exc))
             raise LLMError(f"LLM API error {exc.status_code}: {exc.message}") from exc
         except openai.APIError as exc:
+            logger.warning("llm_error", integration="openai", error=str(exc))
             raise LLMError(f"LLM API error: {exc}") from exc
+
+        latency_ms = round((time.monotonic() - t0) * 1000)
+        logger.info("llm_response", integration="openai", latency_ms=latency_ms)
 
         msg = response.choices[0].message
         if msg is None:

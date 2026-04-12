@@ -1,6 +1,7 @@
-import logging
 from dataclasses import dataclass
 from enum import Enum
+
+import structlog
 
 from src.application.agent.prompts import (
     build_review_prompt,
@@ -38,7 +39,7 @@ class CardBackend(Enum):
     ANKI = "anki"
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _MAX_AGENT_ITERATIONS = 10
 
@@ -64,6 +65,7 @@ class LessonAgent:
         question_count: int = DEFAULT_QUESTION_COUNT,
     ) -> tuple[str, str, str, list[str]]:
         """Fetch article and generate questions. Returns (title, url, text, questions)."""
+        logger.info("lesson_start", level=level, target_lang=target_lang)
         tools = AgentTools(self._fetcher, self._anki, target_lang)
 
         history_note = ""
@@ -105,6 +107,8 @@ class LessonAgent:
                 questions = self._parse_questions(response.content, question_count)
                 article = tools.fetched_article
                 if article and questions:
+                    logger.info("article_fetched", url=article.url)
+                    logger.info("questions_generated", count=len(questions))
                     return article.title, article.url, article.text, questions
 
             break
@@ -153,6 +157,7 @@ class LessonAgent:
                 feedback_text = response.content
             break
 
+        logger.info("review_complete", has_feedback=bool(feedback_text))
         return feedback_text, []
 
     async def generate_writing_task(
@@ -212,6 +217,7 @@ class LessonAgent:
             if response.content:
                 feedback_text = response.content
             break
+        logger.info("writing_review_complete", cards_created=len(tools.created_cards))
         return feedback_text, tools.created_cards
 
     async def topic_vocab_lesson(
@@ -260,6 +266,7 @@ class LessonAgent:
                 messages.append(Message(role="user", content="\n".join(tool_results)))
                 continue
             break
+        logger.info("vocab_generated", count=len(tools.created_cards[:count]), topic=topic_name)
         return topic_name, tools.created_cards[:count]
 
     async def vocab_only_lesson(
@@ -347,6 +354,7 @@ class LessonAgent:
             backend_id = await self._anki.create_card(card, deck_id=deck_id)
         except CardBackendError as e:
             raise WordCaptureError(f"Card backend failed for '{word}': {e}") from e
+        logger.info("word_captured", word_type=card.word_type)
         return VocabCard(
             word=card.word,
             translation=card.translation,

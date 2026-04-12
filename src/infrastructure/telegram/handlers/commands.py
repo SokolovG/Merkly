@@ -46,6 +46,8 @@ from src.infrastructure.telegram.states import OnboardingSG
 
 router = Router()
 
+logger = structlog.get_logger(__name__)
+
 _CB_DEL_CARD = "delcard"
 _CB_WRITING = "writing"
 
@@ -57,11 +59,15 @@ _last_cards: dict[int, list[VocabCard]] = {}
 
 class _HasPendingSession(BaseFilter):
     async def __call__(self, message: Message) -> bool:
+        if (message.text or "").startswith("/"):
+            return False
         return message.from_user is not None and message.from_user.id in _pending_sessions
 
 
 class _HasPendingWriting(BaseFilter):
     async def __call__(self, message: Message) -> bool:
+        if (message.text or "").startswith("/"):
+            return False
         uid = message.from_user.id if message.from_user else None
         return (
             uid is not None and _pending_writing.get(uid, {}).get("state") == "waiting_for_writing"
@@ -94,6 +100,7 @@ async def cmd_start(
     profile = await profile_repo.get(user_id)
     if profile:
         structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+        logger.info("cmd_start", telegram_id=user_id)
 
     if profile:
         await message.answer(
@@ -121,6 +128,7 @@ async def cmd_session(
         return
 
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    logger.info("cmd_session", telegram_id=user_id)
 
     if ActivityType.READING not in profile.learning_strategy:
         await message.answer(strategy_not_enabled("reading"))
@@ -235,6 +243,8 @@ async def cmd_vocab(
             else:
                 force_topic = args_str
 
+    logger.info("cmd_vocab", telegram_id=user_id, force_topic=force_topic, count=count)
+
     await message.answer(fetching_vocab())
 
     # force_topic bypasses pool — user explicitly requested a specific topic (LLM override)
@@ -327,6 +337,7 @@ async def cmd_repeat(
         return
 
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    logger.info("cmd_repeat", telegram_id=user_id)
 
     words = await pool_repo.get_history_words(
         profile.id, str(profile.target_lang), limit=10, oldest_first=True
@@ -353,6 +364,7 @@ async def cmd_clearvocab(
         return
 
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    logger.info("cmd_clearvocab", telegram_id=user_id)
     cleared = await pool_repo.clear_pool(profile.id, str(profile.target_lang))
     if cleared:
         await message.answer(
@@ -373,6 +385,7 @@ async def cmd_help(
         structlog.contextvars.bind_contextvars(
             user_id=str(profile.id), telegram_id=message.from_user.id
         )
+        logger.info("cmd_help", telegram_id=message.from_user.id)
     count = profile.vocab_card_count if profile else 8
     await message.answer(help_text(count), parse_mode="HTML")
 
@@ -413,6 +426,7 @@ async def handle_answer(
     profile = await profile_repo.get(user_id)
     if profile is not None:
         structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    logger.info("answer_received", telegram_id=user_id)
     writing_enabled = profile is None or ActivityType.WRITING in profile.learning_strategy
 
     if writing_enabled:

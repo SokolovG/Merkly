@@ -277,6 +277,7 @@ def build_writing_review_prompt(
             f"3. One sentence of encouragement.\n"
             f"4. Create flashcards for mistakes + highlighted vocabulary. Max 5 cards.\n"
             f"   Only create cards if the student made a genuine attempt.\n"
+            f"5. Do NOT start your response with greetings or thank-you phrases. Begin directly with the feedback.\n"
         )
 
     if mode == "grammar":
@@ -289,6 +290,7 @@ def build_writing_review_prompt(
             f"4. One sentence of encouragement.\n"
             f"5. Create flashcards for grammar mistakes (use the corrected form as the card). Max 5 cards.\n"
             f"   Only create cards if the student made a genuine attempt.\n"
+            f"6. Do NOT start your response with greetings or thank-you phrases. Begin directly with the feedback.\n"
         )
 
     if mode == "article":
@@ -302,6 +304,7 @@ def build_writing_review_prompt(
             f"5. Overall grade estimate: A (sehr gut) / B (gut) / C (befriedigend) / D (needs work), with one sentence why.\n"
             f"6. Create flashcards for: vocabulary gaps, formal alternatives the student should know. Max 5 cards.\n"
             f"   Only create cards if the student made a genuine attempt.\n"
+            f"7. Do NOT start your response with greetings or thank-you phrases. Begin directly with the feedback.\n"
             f"Write feedback in {name}, show corrections also in {native_name}.\n"
         )
 
@@ -371,6 +374,7 @@ Instructions:
 2. Point out every grammar or vocabulary mistake with a correction.
 3. If an answer is simply wrong, explain the correct answer using the article.
 4. Write feedback in {name}. Show corrections also in {native_name} so the student understands.
+5. Do NOT start your response with greetings or thank-you phrases (e.g. "Hello!", "Thank you for your answers!"). Begin directly with the feedback.
 
 Do NOT be overly positive if the answers are incomplete. The student should know exactly what they missed.
 Do NOT create flashcards — this is comprehension feedback only.

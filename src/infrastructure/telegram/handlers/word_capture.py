@@ -1,5 +1,4 @@
 import contextlib
-import logging
 
 import structlog
 from aiogram import F, Router
@@ -23,7 +22,7 @@ from src.infrastructure.telegram.messages import (
     word_empty,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 word_router = Router()
 
@@ -76,6 +75,7 @@ async def handle_word_capture(
         return
 
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    logger.info("word_capture", telegram_id=user_id)
 
     deck_name = next(
         (d.name for d in profile.decks if d.backend_id == profile.active_deck_id),

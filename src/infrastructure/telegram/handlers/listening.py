@@ -1,7 +1,6 @@
 import contextlib
 import os
 from html import escape
-from logging import getLogger
 
 import structlog
 from aiogram import Router
@@ -16,7 +15,7 @@ from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.telegram import messages
 
-logger = getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 router = Router()
 
@@ -39,6 +38,7 @@ async def cmd_listen(
         return
 
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+    logger.info("cmd_listen", telegram_id=user_id)
 
     if ActivityType.LISTENING not in profile.learning_strategy:
         await message.answer(messages.listening_disabled())
@@ -49,7 +49,7 @@ async def cmd_listen(
     try:
         lesson = await listening_service.prepare_lesson(profile)
     except Exception as e:
-        logger.error("Failed to prepare listening lesson: %s", e, exc_info=True)
+        logger.error("listening_lesson_failed", error=str(e))
         await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
         return
 
@@ -87,6 +87,7 @@ async def cmd_listen(
     lambda msg: (
         msg.from_user is not None
         and msg.text is not None
+        and not msg.text.startswith("/")
         and msg.from_user.id in _pending_listening
     )
 )

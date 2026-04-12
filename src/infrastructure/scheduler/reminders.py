@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from html import escape
 
+import structlog
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -14,13 +15,17 @@ from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 
+logger = structlog.get_logger(__name__)
+
 
 async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
+    logger.info("scheduler_job_start", job="send_reminders")
     async with session_factory() as session:
         profile_repo = ProfileRepository(session)
         profiles = await profile_repo.all_with_reminders()
 
     now_utc = datetime.now(UTC)
+    sent = 0
 
     for profile in profiles:
         try:
@@ -38,8 +43,10 @@ async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
                         "Type /session to start or /vocab for quick vocabulary."
                     ),
                 )
-        except Exception:
-            pass  # Don't crash the scheduler if one message fails
+                sent += 1
+        except Exception as exc:
+            logger.warning("scheduler_user_error", job="send_reminders", error=str(exc))
+    logger.info("scheduler_job_end", job="send_reminders", users_processed=sent)
 
 
 async def send_scheduled_vocab(
@@ -47,11 +54,13 @@ async def send_scheduled_vocab(
     session_factory: async_sessionmaker,
     agent: LessonAgent,
 ) -> None:
+    logger.info("scheduler_job_start", job="send_scheduled_vocab")
     async with session_factory() as session:
         profile_repo = ProfileRepository(session)
         profiles = await profile_repo.all()
 
     now_utc = datetime.now(UTC)
+    sent = 0
 
     for profile in profiles:
         if not profile.vocab_scheduler_enabled:
@@ -98,8 +107,10 @@ async def send_scheduled_vocab(
                 text=f"🃏 <b>Daily vocab</b>\n\n{card_list}",
                 parse_mode="HTML",
             )
-        except Exception:
-            pass
+            sent += 1
+        except Exception as exc:
+            logger.warning("scheduler_user_error", job="send_scheduled_vocab", error=str(exc))
+    logger.info("scheduler_job_end", job="send_scheduled_vocab", users_processed=sent)
 
 
 async def refill_all_pools(
@@ -107,9 +118,11 @@ async def refill_all_pools(
     agent: LessonAgent,
 ) -> None:
     """Nightly job: silently top up vocab pools for all users with VOCAB in learning strategy."""
+    logger.info("scheduler_job_start", job="refill_all_pools")
     async with session_factory() as session:
         profiles = await ProfileRepository(session).all()
 
+    processed = 0
     for profile in profiles:
         if ActivityType.VOCAB not in profile.learning_strategy:
             continue
@@ -118,8 +131,10 @@ async def refill_all_pools(
                 pool_repo = VocabPoolRepository(session)
                 refill_service = VocabRefillService(agent=agent, repo=pool_repo)
                 await refill_service.refill_if_needed(profile)
-        except Exception:
-            pass  # Don't crash the scheduler if one user fails
+            processed += 1
+        except Exception as exc:
+            logger.warning("scheduler_user_error", job="refill_all_pools", error=str(exc))
+    logger.info("scheduler_job_end", job="refill_all_pools", users_processed=processed)
 
 
 def setup_scheduler(

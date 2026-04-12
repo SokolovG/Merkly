@@ -1,3 +1,4 @@
+import structlog
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,8 @@ from src.domain.entities import UserDeck, UserProfile
 from src.domain.enums import ActivityType, Goal, Language
 from src.domain.ports.profile_repo import IProfileRepository
 from src.infrastructure.database.models.profile_model import ProfileModel
+
+logger = structlog.get_logger(__name__)
 
 
 class ProfileRepository(IProfileRepository):
@@ -67,7 +70,9 @@ class ProfileRepository(IProfileRepository):
             select(ProfileModel).where(ProfileModel.telegram_id == telegram_id)
         )
         row = result.scalar_one_or_none()
-        return self._to_domain(row) if row else None
+        profile = self._to_domain(row) if row else None
+        logger.debug("db_get", table="profiles", telegram_id=telegram_id, found=profile is not None)
+        return profile
 
     async def save(self, profile: UserProfile) -> None:
         values = {**self._to_values(profile), "id": profile.id}
@@ -78,6 +83,7 @@ class ProfileRepository(IProfileRepository):
         )
         await self._session.execute(stmt)
         await self._session.commit()
+        logger.debug("db_save", table="profiles", telegram_id=profile.telegram_id)
 
     async def all(self) -> list[UserProfile]:
         result = await self._session.execute(select(ProfileModel))

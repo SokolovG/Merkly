@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_USER: str
     DB_PASSWORD: str
+    DEBUG: bool = False
 
     @property
     def async_database_url(self) -> str:

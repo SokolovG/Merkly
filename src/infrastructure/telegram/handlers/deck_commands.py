@@ -178,10 +178,18 @@ async def handle_setdeck_callback(
         return
 
     structlog.contextvars.bind_contextvars(user_id=str(profile.id), telegram_id=user_id)
+
+    # Ensure the selected deck is in profile.decks so name lookup works in +word
+    existing_ids = {d.backend_id for d in profile.decks}
+    updated_decks = list(profile.decks)
+    if backend_id not in existing_ids:
+        updated_decks.append(UserDeck(name=display_name, backend_id=backend_id))
+
     updated_profile = profile.__class__(
         **{
             **{f: getattr(profile, f) for f in profile.__struct_fields__},
             "active_deck_id": backend_id,
+            "decks": updated_decks,
         }
     )
     await profile_repo.save(updated_profile)
