@@ -45,3 +45,4 @@ def configure_structlog(debug: bool = False) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("h11").setLevel(logging.WARNING)
+    logging.getLogger("pydub").setLevel(logging.WARNING)

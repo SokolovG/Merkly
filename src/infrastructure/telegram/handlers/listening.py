@@ -1,5 +1,4 @@
 import asyncio
-import contextlib
 import os
 from html import escape
 
@@ -93,11 +92,6 @@ async def cmd_listen(
             await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
             return
 
-        # Dedup retry (existing pattern)
-        if await session_history_repo.has_seen(profile.id, lesson.episode_url):
-            with contextlib.suppress(Exception):
-                lesson = await listening_service.prepare_lesson(profile)
-
         try:
             with open(lesson.audio_path, "rb") as f:
                 await message.answer_audio(
@@ -108,6 +102,9 @@ async def cmd_listen(
             os.unlink(lesson.audio_path)
 
         await session_history_repo.record(profile.id, lesson.episode_url, ActivityType.LISTENING)
+        await listening_pool_repo.record_history(
+            profile.id, lesson.episode_url, str(profile.target_lang)
+        )
         await message.answer(messages.listening_transcribing())  # T23: live path only
 
         _pending_listening[user_id] = {

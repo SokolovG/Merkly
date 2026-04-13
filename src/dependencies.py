@@ -168,9 +168,8 @@ class AppProvider(Provider):
         self,
         service: ListeningAgent,
         repo: ListeningPoolRepository,
-        history_repo: SessionHistoryRepository,
     ) -> ListeningRefillService:
-        return ListeningRefillService(service=service, repo=repo, history_repo=history_repo)
+        return ListeningRefillService(service=service, repo=repo)
 
 
 def create_container():

@@ -14,4 +14,4 @@ class PodcastEpisode(msgspec.Struct):
 class IPodcastFetcher(ABC):
     @abstractmethod
     async def fetch(self, level: str, language: str) -> PodcastEpisode | None:
-        """Return an episode or None if not found."""
+        """Return an episode, or None if exhausted."""

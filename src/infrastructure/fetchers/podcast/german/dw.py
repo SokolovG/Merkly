@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 
 import feedparser
 
@@ -17,26 +18,29 @@ class DWPodcastFetcher(IPodcastFetcher):
             loop = asyncio.get_running_loop()
             feed = await loop.run_in_executor(None, feedparser.parse, _DW_RSS_URL)
             if not feed.entries:
-                logger.warning("DWPodcastFetcher: feed has no entries")
+                reason = getattr(feed, "bozo_exception", None)
+                logger.warning("DWPodcastFetcher: feed has no entries: %s", reason)
                 return None
-            entry = feed.entries[0]
-            audio_url = next(
-                (
-                    e["href"]
-                    for e in entry.get("enclosures", [])
-                    if e.get("type", "").startswith("audio")
-                ),
-                "",
-            )
-            if not audio_url:
-                logger.warning("DWPodcastFetcher: no audio enclosure in first entry")
-                return None
-            return PodcastEpisode(
-                title=entry.get("title", ""),
-                audio_url=audio_url,
-                duration_seconds=parse_duration(entry.get("itunes_duration", "0")),
-                description=entry.get("summary", ""),
-            )
+            entries = list(feed.entries)
+            random.shuffle(entries)
+            for entry in entries:
+                audio_url = next(
+                    (
+                        e["href"]
+                        for e in entry.get("enclosures", [])
+                        if e.get("type", "").startswith("audio")
+                    ),
+                    "",
+                )
+                if audio_url:
+                    return PodcastEpisode(
+                        title=entry.get("title", ""),
+                        audio_url=audio_url,
+                        duration_seconds=parse_duration(entry.get("itunes_duration", "0")),
+                        description=entry.get("summary", ""),
+                    )
+            logger.warning("DWPodcastFetcher: no audio enclosures in feed")
+            return None
         except Exception as e:
             logger.warning("DWPodcastFetcher failed: %s", e)
             return None

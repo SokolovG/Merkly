@@ -8,7 +8,6 @@ from src.application.listening_service import ListeningAgent
 from src.domain.constants import LISTENING_POOL_FILL_SIZE, LISTENING_POOL_THRESHOLD
 from src.domain.entities import PooledListeningLesson, UserProfile
 from src.domain.ports.listening_pool_repo import IListeningPoolRepository
-from src.domain.ports.session_history_repo import ISessionHistoryRepository
 
 logger = structlog.get_logger(__name__)
 
@@ -18,11 +17,9 @@ class ListeningRefillService:
         self,
         service: ListeningAgent,
         repo: IListeningPoolRepository,
-        history_repo: ISessionHistoryRepository,
     ) -> None:
         self._service = service
         self._repo = repo
-        self._history_repo = history_repo
 
     async def refill_if_needed(self, profile: UserProfile) -> bool:
         """Refill listening pool if below threshold. Returns True if refill was triggered."""
@@ -46,14 +43,6 @@ class ListeningRefillService:
             except Exception as exc:
                 logger.warning("listening_pool_refill_prepare_failed", error=str(exc))
                 break
-
-            # Skip if URL already in this batch or already served to user
-            if any(les.episode_url == lesson.episode_url for les in lessons):
-                logger.info("listening_pool_refill_skip_duplicate", url=lesson.episode_url)
-                continue
-            if await self._history_repo.has_seen(profile.id, lesson.episode_url):
-                logger.info("listening_pool_refill_skip_seen", url=lesson.episode_url)
-                continue
 
             lessons.append(
                 PooledListeningLesson(

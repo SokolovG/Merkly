@@ -3,6 +3,7 @@ import logging
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 from src.infrastructure.exceptions import InfrastructureError
 from src.infrastructure.fetchers.podcast.constants import LANGUAGE_PODCAST_FETCHERS
+from src.infrastructure.fetchers.podcast.german.dw_podcast_index import DWPodcastIndexFetcher
 from src.infrastructure.fetchers.podcast.itunes import ItunesPodcastFetcher
 from src.infrastructure.fetchers.podcast.podcast_index import PodcastIndexFetcher
 
@@ -20,9 +21,21 @@ class PodcastFetcherRouter(IPodcastFetcher):
 
     @classmethod
     def build(
-        cls, podcast_index_api_key: str, podcast_index_api_secret: str
+        cls,
+        podcast_index_api_key: str,
+        podcast_index_api_secret: str,
     ) -> "PodcastFetcherRouter":
         """Build the default router. Language sources come from LANGUAGE_PODCAST_FETCHERS."""
+        lang_specific: dict[str, list[IPodcastFetcher]] = {
+            lang: [fetcher_cls() for fetcher_cls in fetcher_classes]
+            for lang, fetcher_classes in LANGUAGE_PODCAST_FETCHERS.items()
+        }
+        lang_specific.setdefault("de", []).append(
+            DWPodcastIndexFetcher(
+                api_key=podcast_index_api_key,
+                api_secret=podcast_index_api_secret,
+            )
+        )
         return cls(
             generic=[
                 ItunesPodcastFetcher(),
@@ -31,10 +44,7 @@ class PodcastFetcherRouter(IPodcastFetcher):
                     api_secret=podcast_index_api_secret,
                 ),
             ],
-            language_specific={
-                lang: [cls() for cls in fetcher_classes]
-                for lang, fetcher_classes in LANGUAGE_PODCAST_FETCHERS.items()
-            },
+            language_specific=lang_specific,
         )
 
     async def fetch(self, level: str, language: str) -> PodcastEpisode:

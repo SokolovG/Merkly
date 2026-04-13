@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 
 import feedparser
 
@@ -22,27 +23,29 @@ class ORFPodcastFetcher(IPodcastFetcher):
             try:
                 feed = await loop.run_in_executor(None, feedparser.parse, feed_url)
                 if not feed.entries:
-                    logger.warning("ORF feed %s: no entries", feed_url)
+                    reason = getattr(feed, "bozo_exception", None)
+                    logger.warning("ORF feed %s: no entries: %s", feed_url, reason)
                     continue
-                entry = feed.entries[0]
-                audio_url = next(
-                    (
-                        e["href"]
-                        for e in entry.get("enclosures", [])
-                        if e.get("type", "").startswith("audio")
-                    ),
-                    "",
-                )
-                if not audio_url:
-                    logger.warning("ORF feed %s: no audio enclosure in first entry", feed_url)
-                    continue
-                return PodcastEpisode(
-                    title=entry.get("title", ""),
-                    audio_url=audio_url,
-                    duration_seconds=parse_duration(entry.get("itunes_duration", "0")),
-                    description=entry.get("summary", ""),
-                )
+                entries = list(feed.entries)
+                random.shuffle(entries)
+                for entry in entries:
+                    audio_url = next(
+                        (
+                            e["href"]
+                            for e in entry.get("enclosures", [])
+                            if e.get("type", "").startswith("audio")
+                        ),
+                        "",
+                    )
+                    if audio_url:
+                        return PodcastEpisode(
+                            title=entry.get("title", ""),
+                            audio_url=audio_url,
+                            duration_seconds=parse_duration(entry.get("itunes_duration", "0")),
+                            description=entry.get("summary", ""),
+                        )
             except Exception as e:
                 logger.warning("ORF feed %s failed: %s", feed_url, e)
                 continue
+        logger.warning("ORFPodcastFetcher: no audio enclosures across all feeds")
         return None

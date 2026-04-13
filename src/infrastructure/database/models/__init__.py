@@ -1,5 +1,6 @@
 from src.infrastructure.database.models.article_pool_model import ArticlePoolModel
 from src.infrastructure.database.models.base import Base
+from src.infrastructure.database.models.listening_history_model import ListeningHistoryModel
 from src.infrastructure.database.models.listening_pool_model import ListeningPoolModel
 from src.infrastructure.database.models.profile_model import ProfileModel
 from src.infrastructure.database.models.session_history_model import SessionHistoryModel
@@ -16,4 +17,5 @@ __all__ = [
     "VocabHistoryModel",
     "ArticlePoolModel",
     "ListeningPoolModel",
+    "ListeningHistoryModel",
 ]

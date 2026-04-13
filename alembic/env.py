@@ -14,6 +14,7 @@ from src.infrastructure.database.models import (
     SessionModel,  # noqa
     VocabHistoryModel,  # noqa
     VocabPoolModel,  # noqa
+    ListeningHistoryModel,  # noqa
 )
 
 

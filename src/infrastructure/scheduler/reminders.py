@@ -18,14 +18,12 @@ from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
 from src.infrastructure.database.repositories.listening_pool_repo import ListeningPoolRepository
-from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 
 logger = structlog.get_logger(__name__)
 
 
 async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
-    logger.info("scheduler_job_start", job="send_reminders")
     async with session_factory() as session:
         profile_repo = ProfileRepository(session)
         profiles = await profile_repo.all_with_reminders()
@@ -53,6 +51,7 @@ async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
         except Exception as exc:
             logger.warning("scheduler_user_error", job="send_reminders", error=str(exc))
     if sent > 0:
+        logger.info("scheduler_job_start", job="send_reminders")
         logger.info("scheduler_job_end", job="send_reminders", users_processed=sent)
 
 
@@ -61,7 +60,6 @@ async def send_scheduled_vocab(
     session_factory: async_sessionmaker,
     agent: LessonAgent,
 ) -> None:
-    logger.info("scheduler_job_start", job="send_scheduled_vocab")
     async with session_factory() as session:
         profile_repo = ProfileRepository(session)
         profiles = await profile_repo.all()
@@ -118,6 +116,7 @@ async def send_scheduled_vocab(
         except Exception as exc:
             logger.warning("scheduler_user_error", job="send_scheduled_vocab", error=str(exc))
     if sent > 0:
+        logger.info("scheduler_job_start", job="send_scheduled_vocab")
         logger.info("scheduler_job_end", job="send_scheduled_vocab", users_processed=sent)
 
 
@@ -126,7 +125,6 @@ async def refill_all_pools(
     agent: LessonAgent,
 ) -> None:
     """Nightly job: silently top up vocab pools for all users with VOCAB in learning strategy."""
-    logger.info("scheduler_job_start", job="refill_all_pools")
     async with session_factory() as session:
         profiles = await ProfileRepository(session).all()
 
@@ -143,6 +141,7 @@ async def refill_all_pools(
         except Exception as exc:
             logger.warning("scheduler_user_error", job="refill_all_pools", error=str(exc))
     if processed > 0:
+        logger.info("scheduler_job_start", job="refill_all_pools")
         logger.info("scheduler_job_end", job="refill_all_pools", users_processed=processed)
 
 
@@ -152,7 +151,6 @@ async def refill_all_article_pools(
 ) -> None:
     """Nightly job:
     silently top up article pools for all users with READING in learning_strategy."""
-    logger.info("scheduler_job_start", job="refill_all_article_pools")
     async with session_factory() as session:
         profiles = await ProfileRepository(session).all()
 
@@ -169,6 +167,7 @@ async def refill_all_article_pools(
         except Exception as exc:
             logger.warning("scheduler_user_error", job="refill_all_article_pools", error=str(exc))
     if processed > 0:
+        logger.info("scheduler_job_start", job="refill_all_article_pools")
         logger.info("scheduler_job_end", job="refill_all_article_pools", users_processed=processed)
 
 
@@ -178,7 +177,6 @@ async def refill_all_listening_pools(
 ) -> None:
     """Nightly job:
     silently top up listening pools for all users with LISTENING in learning_strategy."""
-    logger.info("scheduler_job_start", job="refill_all_listening_pools")
     async with session_factory() as session:
         profiles = await ProfileRepository(session).all()
 
@@ -189,15 +187,13 @@ async def refill_all_listening_pools(
         try:
             async with session_factory() as session:
                 repo = ListeningPoolRepository(session)
-                history_repo = SessionHistoryRepository(session)
-                refill = ListeningRefillService(
-                    service=listening_service, repo=repo, history_repo=history_repo
-                )
+                refill = ListeningRefillService(service=listening_service, repo=repo)
                 await refill.refill_if_needed(profile)
             processed += 1
         except Exception as exc:
             logger.warning("scheduler_user_error", job="refill_all_listening_pools", error=str(exc))
     if processed > 0:
+        logger.info("scheduler_job_start", job="refill_all_listening_pools")
         logger.info(
             "scheduler_job_end", job="refill_all_listening_pools", users_processed=processed
         )

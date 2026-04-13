@@ -1,4 +1,5 @@
 import logging
+import random
 
 import httpx
 
@@ -24,20 +25,16 @@ class ItunesPodcastFetcher(IPodcastFetcher):
             results = data.get("results", [])
             if not results:
                 return None
-            # Pick first result that has an episodeUrl
+            random.shuffle(results)
             for item in results:
                 audio_url = item.get("episodeUrl") or item.get("previewUrl")
                 if not audio_url:
                     continue
-                title = item.get("trackName", "")
-                duration_ms = item.get("trackTimeMillis", 0)
-                duration_seconds = duration_ms // 1000 if duration_ms else 0
-                description = item.get("description", "")
                 return PodcastEpisode(
-                    title=title,
+                    title=item.get("trackName", ""),
                     audio_url=audio_url,
-                    duration_seconds=duration_seconds,
-                    description=description,
+                    duration_seconds=item.get("trackTimeMillis", 0) // 1000,
+                    description=item.get("description", ""),
                 )
             return None
         except Exception as e:
