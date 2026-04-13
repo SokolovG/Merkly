@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import os
 from html import escape
@@ -9,9 +10,12 @@ from aiogram.types import BufferedInputFile, Message
 from dishka.integrations.aiogram import FromDishka
 
 from src.application.agent.core import LessonAgent
+from src.application.listening_refill_service import ListeningRefillService
 from src.application.listening_service import ListeningAgent
 from src.domain.enums import ActivityType
+from src.infrastructure.audio import AudioService
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.listening_pool_repo import ListeningPoolRepository
 from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.telegram import messages
 
@@ -28,6 +32,9 @@ async def cmd_listen(
     profile_repo: FromDishka[ProfileRepository],
     listening_service: FromDishka[ListeningAgent],
     session_history_repo: FromDishka[SessionHistoryRepository],
+    listening_pool_repo: FromDishka[ListeningPoolRepository],
+    listening_refill_service: FromDishka[ListeningRefillService],
+    audio_service: FromDishka[AudioService],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
@@ -46,41 +53,85 @@ async def cmd_listen(
 
     await message.answer(messages.listening_fetching())
 
-    try:
-        lesson = await listening_service.prepare_lesson(profile)
-    except Exception as e:
-        logger.error("listening_lesson_failed", error=str(e))
-        await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
-        return
+    # --- Listening Pool: try pool first ---
+    pooled = await listening_pool_repo.get_oldest(profile.id, str(profile.target_lang))
+    if pooled and not await session_history_repo.has_seen(profile.id, pooled.episode_url):
+        # Pool hit — skip Whisper + podcast search
+        await listening_pool_repo.mark_served(pooled.id)
+        logger.info("cmd_listen_pool_hit", messenger_id=user_id)
 
-    # Dedup: retry once if this episode URL was already served to this user
-    if await session_history_repo.has_seen(profile.id, lesson.episode_url):
-        with contextlib.suppress(Exception):
+        audio_path = await audio_service.download(pooled.episode_url, profile.episode_duration_min)
+        try:
+            with open(audio_path, "rb") as f:
+                await message.answer_audio(
+                    BufferedInputFile(f.read(), filename="lesson.mp3"),
+                    caption=f"🎧 {escape(pooled.title)}",
+                )
+        finally:
+            os.unlink(audio_path)
+
+        await session_history_repo.record(profile.id, pooled.episode_url, ActivityType.LISTENING)
+
+        _pending_listening[user_id] = {
+            "transcript": pooled.transcript,
+            "questions": pooled.questions,
+            "level": profile.level,
+            "native_lang": profile.native_lang,
+            "target_lang": profile.target_lang,
+            "episode_url": pooled.episode_url,
+        }
+    else:
+        # Pool miss — full live path (Whisper + podcast search)
+        if pooled:
+            await listening_pool_repo.mark_served(pooled.id)  # discard stale
+        logger.info("cmd_listen_pool_miss", messenger_id=user_id)
+
+        try:
             lesson = await listening_service.prepare_lesson(profile)
+        except Exception as e:
+            logger.error("listening_lesson_failed", error=str(e))
+            await message.answer(f"Couldn't prepare listening lesson: {e}\nTry again later.")
+            return
 
-    try:
-        with open(lesson.audio_path, "rb") as f:
-            await message.answer_audio(
-                BufferedInputFile(f.read(), filename="lesson.mp3"),
-                caption=f"🎧 {escape(lesson.title)}",
-            )
-    finally:
-        os.unlink(lesson.audio_path)
+        # Dedup retry (existing pattern)
+        if await session_history_repo.has_seen(profile.id, lesson.episode_url):
+            with contextlib.suppress(Exception):
+                lesson = await listening_service.prepare_lesson(profile)
 
-    await session_history_repo.record(profile.id, lesson.episode_url, ActivityType.LISTENING)
-    await message.answer(messages.listening_transcribing())
+        try:
+            with open(lesson.audio_path, "rb") as f:
+                await message.answer_audio(
+                    BufferedInputFile(f.read(), filename="lesson.mp3"),
+                    caption=f"🎧 {escape(lesson.title)}",
+                )
+        finally:
+            os.unlink(lesson.audio_path)
 
-    _pending_listening[user_id] = {
-        "transcript": lesson.transcript,
-        "questions": lesson.questions,
-        "level": profile.level,
-        "native_lang": profile.native_lang,
-        "target_lang": profile.target_lang,
-        "episode_url": lesson.episode_url,
-    }
+        await session_history_repo.record(profile.id, lesson.episode_url, ActivityType.LISTENING)
+        await message.answer(messages.listening_transcribing())  # T23: live path only
 
-    questions_text = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(lesson.questions))
+        _pending_listening[user_id] = {
+            "transcript": lesson.transcript,
+            "questions": lesson.questions,
+            "level": profile.level,
+            "native_lang": profile.native_lang,
+            "target_lang": profile.target_lang,
+            "episode_url": lesson.episode_url,
+        }
+
+    # Build questions text (shared: both paths write to _pending_listening above)
+    questions = _pending_listening[user_id]["questions"]
+    questions_text = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(questions))
     await message.answer(messages.listening_questions(questions_text))
+
+    # Eager refill (non-blocking — fire and forget)
+    async def _refill_with_log() -> None:
+        try:
+            await listening_refill_service.refill_if_needed(profile)
+        except Exception as exc:
+            logger.error("listening_pool_eager_refill_failed", error=str(exc))
+
+    asyncio.create_task(_refill_with_log())
 
 
 @router.message(

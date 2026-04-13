@@ -73,9 +73,6 @@ class ProfileRepository(IProfileRepository):
         )
         row = result.scalar_one_or_none()
         profile = self._to_domain(row) if row else None
-        logger.debug(
-            "db_get", table="profiles", messenger_id=messenger_id, found=profile is not None
-        )
         return profile
 
     async def save(self, profile: UserProfile) -> None:

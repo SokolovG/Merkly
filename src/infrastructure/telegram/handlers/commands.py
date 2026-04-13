@@ -1,3 +1,5 @@
+import asyncio
+import contextlib
 import uuid
 from datetime import datetime
 from html import escape
@@ -12,11 +14,13 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
+from src.application.article_refill_service import ArticleRefillService
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.entities import Session, VocabCard
 from src.domain.enums import ActivityType
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
+from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
 from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.telegram.messages import (
@@ -122,6 +126,8 @@ async def cmd_session(
     session_repo: FromDishka[SessionRepository],
     session_history_repo: FromDishka[SessionHistoryRepository],
     agent: FromDishka[LessonAgent],
+    article_pool_repo: FromDishka[ArticlePoolRepository],
+    article_refill_service: FromDishka[ArticleRefillService],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
@@ -140,28 +146,21 @@ async def cmd_session(
 
     await message.answer(preparing_lesson())
 
-    # Get recent session topics to avoid repetition
-    recent = await session_repo.get_recent(profile.id, limit=3)
-    recent_topics = [s.article_title for s in recent]
-
-    try:
-        title, url, text, questions = await agent.prepare_reading_lesson(
-            level=profile.level,
-            goal=profile.goal,
-            native_lang=profile.native_lang,
-            target_lang=profile.target_lang,
-            recent_topics=recent_topics,
-            question_count=profile.question_count,
-        )
-    except Exception as e:
-        await message.answer(lesson_failed(str(e)))
-        return
-
-    # Dedup: retry once if this article URL was already served to this user
-    if await session_history_repo.has_seen(profile.id, url):
-        import contextlib
-
-        with contextlib.suppress(Exception):
+    # --- Article Pool: try pool first ---
+    pooled = await article_pool_repo.get_oldest(profile.id, str(profile.target_lang))
+    if pooled and not await session_history_repo.has_seen(profile.id, pooled.url):
+        # Serve from pool — instant
+        title, url, text, questions = pooled.title, pooled.url, pooled.text, pooled.questions
+        await article_pool_repo.mark_served(pooled.id)
+        logger.info("cmd_session_pool_hit", messenger_id=user_id)
+    else:
+        # Pool miss (empty or stale entry) — live fetch
+        if pooled:
+            await article_pool_repo.mark_served(pooled.id)  # discard stale
+        logger.info("cmd_session_pool_miss", messenger_id=user_id)
+        recent = await session_repo.get_recent(profile.id, limit=3)
+        recent_topics = [s.article_title for s in recent]
+        try:
             title, url, text, questions = await agent.prepare_reading_lesson(
                 level=profile.level,
                 goal=profile.goal,
@@ -170,6 +169,20 @@ async def cmd_session(
                 recent_topics=recent_topics,
                 question_count=profile.question_count,
             )
+        except Exception as e:
+            await message.answer(lesson_failed(str(e)))
+            return
+        # Dedup retry (existing pattern, live path only)
+        if await session_history_repo.has_seen(profile.id, url):
+            with contextlib.suppress(Exception):
+                title, url, text, questions = await agent.prepare_reading_lesson(
+                    level=profile.level,
+                    goal=profile.goal,
+                    native_lang=profile.native_lang,
+                    target_lang=profile.target_lang,
+                    recent_topics=recent_topics,
+                    question_count=profile.question_count,
+                )
 
     session_id = str(uuid.uuid4())[:8]
 
@@ -198,6 +211,9 @@ async def cmd_session(
         "native_lang": profile.native_lang,
         "target_lang": profile.target_lang,
     }
+
+    # Eager refill (non-blocking — fire and forget via asyncio.create_task)
+    asyncio.create_task(article_refill_service.refill_if_needed(profile))
 
 
 @router.message(Command("vocab"))

@@ -41,6 +41,7 @@ def configure_structlog(debug: bool = False) -> None:
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
     logging.getLogger("aiogram").setLevel(logging.ERROR)
     logging.getLogger("aiogram_dialog").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("h11").setLevel(logging.WARNING)

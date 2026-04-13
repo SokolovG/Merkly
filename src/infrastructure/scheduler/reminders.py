@@ -8,11 +8,17 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from src.application.agent.core import LessonAgent
 from src.application.agent.prompts import lang_name
+from src.application.article_refill_service import ArticleRefillService
+from src.application.listening_refill_service import ListeningRefillService
+from src.application.listening_service import ListeningAgent
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import LANGUAGE_FLAGS
 from src.domain.entities import VocabCard
 from src.domain.enums import ActivityType
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
+from src.infrastructure.database.repositories.listening_pool_repo import ListeningPoolRepository
+from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 
 logger = structlog.get_logger(__name__)
@@ -46,7 +52,8 @@ async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
                 sent += 1
         except Exception as exc:
             logger.warning("scheduler_user_error", job="send_reminders", error=str(exc))
-    logger.info("scheduler_job_end", job="send_reminders", users_processed=sent)
+    if sent > 0:
+        logger.info("scheduler_job_end", job="send_reminders", users_processed=sent)
 
 
 async def send_scheduled_vocab(
@@ -110,7 +117,8 @@ async def send_scheduled_vocab(
             sent += 1
         except Exception as exc:
             logger.warning("scheduler_user_error", job="send_scheduled_vocab", error=str(exc))
-    logger.info("scheduler_job_end", job="send_scheduled_vocab", users_processed=sent)
+    if sent > 0:
+        logger.info("scheduler_job_end", job="send_scheduled_vocab", users_processed=sent)
 
 
 async def refill_all_pools(
@@ -134,13 +142,72 @@ async def refill_all_pools(
             processed += 1
         except Exception as exc:
             logger.warning("scheduler_user_error", job="refill_all_pools", error=str(exc))
-    logger.info("scheduler_job_end", job="refill_all_pools", users_processed=processed)
+    if processed > 0:
+        logger.info("scheduler_job_end", job="refill_all_pools", users_processed=processed)
+
+
+async def refill_all_article_pools(
+    session_factory: async_sessionmaker,
+    agent: LessonAgent,
+) -> None:
+    """Nightly job:
+    silently top up article pools for all users with READING in learning_strategy."""
+    logger.info("scheduler_job_start", job="refill_all_article_pools")
+    async with session_factory() as session:
+        profiles = await ProfileRepository(session).all()
+
+    processed = 0
+    for profile in profiles:
+        if ActivityType.READING not in profile.learning_strategy:
+            continue
+        try:
+            async with session_factory() as session:
+                repo = ArticlePoolRepository(session)
+                refill = ArticleRefillService(agent=agent, repo=repo)
+                await refill.refill_if_needed(profile)
+            processed += 1
+        except Exception as exc:
+            logger.warning("scheduler_user_error", job="refill_all_article_pools", error=str(exc))
+    if processed > 0:
+        logger.info("scheduler_job_end", job="refill_all_article_pools", users_processed=processed)
+
+
+async def refill_all_listening_pools(
+    session_factory: async_sessionmaker,
+    listening_service: ListeningAgent,
+) -> None:
+    """Nightly job:
+    silently top up listening pools for all users with LISTENING in learning_strategy."""
+    logger.info("scheduler_job_start", job="refill_all_listening_pools")
+    async with session_factory() as session:
+        profiles = await ProfileRepository(session).all()
+
+    processed = 0
+    for profile in profiles:
+        if ActivityType.LISTENING not in profile.learning_strategy:
+            continue
+        try:
+            async with session_factory() as session:
+                repo = ListeningPoolRepository(session)
+                history_repo = SessionHistoryRepository(session)
+                refill = ListeningRefillService(
+                    service=listening_service, repo=repo, history_repo=history_repo
+                )
+                await refill.refill_if_needed(profile)
+            processed += 1
+        except Exception as exc:
+            logger.warning("scheduler_user_error", job="refill_all_listening_pools", error=str(exc))
+    if processed > 0:
+        logger.info(
+            "scheduler_job_end", job="refill_all_listening_pools", users_processed=processed
+        )
 
 
 def setup_scheduler(
     bot: Bot,
     session_factory: async_sessionmaker,
     agent: LessonAgent,
+    listening_service: ListeningAgent,
 ) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
     scheduler.add_job(
@@ -161,5 +228,19 @@ def setup_scheduler(
         hour=3,
         minute=0,
         kwargs={"session_factory": session_factory, "agent": agent},
+    )
+    scheduler.add_job(
+        refill_all_article_pools,
+        trigger="cron",
+        hour=3,
+        minute=30,
+        kwargs={"session_factory": session_factory, "agent": agent},
+    )
+    scheduler.add_job(
+        refill_all_listening_pools,
+        trigger="cron",
+        hour=4,
+        minute=0,
+        kwargs={"session_factory": session_factory, "listening_service": listening_service},
     )
     return scheduler

@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.application.agent.core import CardBackend, LessonAgent
+from src.application.article_refill_service import ArticleRefillService
+from src.application.listening_refill_service import ListeningRefillService
 from src.application.listening_service import ListeningAgent
 from src.application.vocab_refill_service import VocabRefillService
 from src.config import Settings
@@ -16,6 +18,8 @@ from src.infrastructure.audio import AudioService
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import (
+    ArticlePoolRepository,
+    ListeningPoolRepository,
     ProfileRepository,
     SessionHistoryRepository,
     SessionRepository,
@@ -142,6 +146,31 @@ class AppProvider(Provider):
         repo: VocabPoolRepository,
     ) -> VocabRefillService:
         return VocabRefillService(agent=agent, repo=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def article_pool_repo(self, session: AsyncSession) -> ArticlePoolRepository:
+        return ArticlePoolRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def article_refill_service(
+        self,
+        agent: LessonAgent,
+        repo: ArticlePoolRepository,
+    ) -> ArticleRefillService:
+        return ArticleRefillService(agent=agent, repo=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def listening_pool_repo(self, session: AsyncSession) -> ListeningPoolRepository:
+        return ListeningPoolRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def listening_refill_service(
+        self,
+        service: ListeningAgent,
+        repo: ListeningPoolRepository,
+        history_repo: SessionHistoryRepository,
+    ) -> ListeningRefillService:
+        return ListeningRefillService(service=service, repo=repo, history_repo=history_repo)
 
 
 def create_container():

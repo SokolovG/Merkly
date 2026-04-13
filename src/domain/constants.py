@@ -159,3 +159,9 @@ EPISODE_DURATION_OPTIONS: list[int] = [3, 5, 7, 10]
 POOL_THRESHOLD: int = 16  # Refill when pool drops below this
 POOL_FILL_SIZE: int = 30  # Cards to generate per LLM batch
 POOL_RECENT_HINT: int = 20  # Words passed as soft exclusion hint in LLM prompt
+
+ARTICLE_POOL_THRESHOLD: int = 3  # refill when pool drops below this
+ARTICLE_POOL_FILL_SIZE: int = 5  # articles to pre-fetch per refill batch
+
+LISTENING_POOL_THRESHOLD: int = 2  # refill when pool drops below this
+LISTENING_POOL_FILL_SIZE: int = 3  # lessons to pre-fetch per refill batch

@@ -7,6 +7,7 @@ from dishka.integrations.aiogram import setup_dishka
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.application.agent.core import LessonAgent
+from src.application.listening_service import ListeningAgent
 from src.config import Settings
 from src.dependencies import create_container
 from src.infrastructure.logging_config import configure_structlog
@@ -30,7 +31,8 @@ async def main() -> None:
 
     session_factory = await container.get(async_sessionmaker[AsyncSession])
     agent = await container.get(LessonAgent)
-    scheduler = setup_scheduler(bot, session_factory, agent)
+    listening_service = await container.get(ListeningAgent)
+    scheduler = setup_scheduler(bot, session_factory, agent, listening_service)
     scheduler.start()
 
     logger.info("bot_started", mode="polling")

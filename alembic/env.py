@@ -4,8 +4,18 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from src.infrastructure.database.models.base import Base
-from src.infrastructure.database.models import ProfileModel, SessionModel  # noqa
+from src.infrastructure.database.models import (
+    Base,
+    ProfileModel,  # noqa
+    SessionModel,  # noqa
+    ArticlePoolModel,  # noqa
+    ListeningPoolModel,  # noqa
+    SessionHistoryModel,  # noqa
+    SessionModel,  # noqa
+    VocabHistoryModel,  # noqa
+    VocabPoolModel,  # noqa
+)
+
 
 config = context.config
 

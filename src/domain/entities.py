@@ -68,6 +68,25 @@ class PooledVocabCard(msgspec.Struct):
     target_lang: str = "de"
 
 
+class PooledArticle(msgspec.Struct):
+    id: uuid.UUID
+    url: str
+    title: str
+    text: str
+    questions: list[str]
+    target_lang: str
+
+
+class PooledListeningLesson(msgspec.Struct):
+    id: uuid.UUID
+    episode_url: str
+    title: str
+    transcript: str
+    questions: list[str]
+    target_lang: str
+    level: str
+
+
 class Session(msgspec.Struct):
     session_id: str
     user_id: int

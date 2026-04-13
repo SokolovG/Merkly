@@ -327,7 +327,7 @@ def build_word_capture_prompt(
         f"The student is learning {name} and wants to add '{word}' to their flashcard deck."
         f"{context_hint}\n\n"
         f"Respond with ONLY a JSON object (no markdown, no code fences, no extra text) with these fields:\n"
-        f"  word: the {name} word exactly as given\n"
+        f"  word: the base/dictionary form of the word (infinitive for verbs, nominative singular for nouns, base form for adjectives). If the input is already the base form, use it as-is.\n"
         f"  article: grammatical article if noun (e.g. der/die/das for German, el/la for Spanish) — null if not a noun\n"
         f"  word_type: one of noun / verb / adjective / phrase\n"
         f"  translation: {native_name} translation\n"
@@ -336,17 +336,15 @@ def build_word_capture_prompt(
         f"IMPORTANT: write grammar labels in English only (e.g. 'Plural', 'Past participle', 'Preposition + case'). "
         f"Only the {native_name} translation field uses {native_name} — grammar_note must be English labels + {name} forms. "
         f"Use terminology appropriate for {name} (not German-specific labels). Rules:\n"
-        f"    - If the input looks inflected (conjugated verb, plural noun, declined form): "
-        f"show the base/dictionary form first.\n"
         f"    - Noun: include the plural form.\n"
         f"    - Verb: include the past participle or equivalent perfective form in {name}.\n"
         f"    - Verb with a common preposition: show the preposition and its required case/form.\n"
         f"    - Adjective or phrase: one key usage note.\n"
+        f"    NEVER write negative facts (e.g. 'Separable prefix: no', 'No article', 'No plural'). Only include a note if it adds information.\n"
         f"    Max 2 short notes, semicolon-separated.\n\n"
-        f'Example for "Brot" (German \u2192 English):\n'
-        f'{{"word":"Brot","article":"das","word_type":"noun","translation":"bread",'
-        f'"example_sentence":"Ich esse jeden Morgen frisches Brot.",'
-        f'"grammar_note":"Plural: die Brote"}}\n\n'
+        f"Examples (German \u2192 English):\n"
+        f'Input "Brot": {{"word":"Brot","article":"das","word_type":"noun","translation":"bread","example_sentence":"Ich esse jeden Morgen frisches Brot.","grammar_note":"Plural: die Brote"}}\n'
+        f'Input "stapelte" (inflected): {{"word":"stapeln","article":null,"word_type":"verb","translation":"to stack","example_sentence":"Er stapelte die Bücher auf dem Tisch.","grammar_note":"Past participle: gestapelt"}}\n\n'
         f"Now generate the JSON for '{word}'."
     )
 
