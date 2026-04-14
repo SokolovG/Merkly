@@ -20,8 +20,3 @@ class IListeningPoolRepository(ABC):
     async def add_to_pool(self, user_id: uuid.UUID, lessons: list[PooledListeningLesson]) -> None:
         """Insert lessons not already in listening_history for this user."""
         ...
-
-    @abstractmethod
-    async def record_history(self, user_id: uuid.UUID, episode_url: str, target_lang: str) -> None:
-        """Record a served episode in listening_history (live path)."""
-        ...

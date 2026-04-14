@@ -1,12 +1,12 @@
-import logging
 import random
 
 import httpx
+import structlog
 
 from src.domain.ports.podcast_fetcher import PodcastEpisode
 from src.infrastructure.fetchers.podcast.podcast_index import PodcastIndexFetcher
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _DW_FEED_ID = "1019192"  # DW "Langsam gesprochene Nachrichten" on PodcastIndex
 

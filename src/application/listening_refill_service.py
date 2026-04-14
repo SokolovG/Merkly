@@ -42,7 +42,7 @@ class ListeningRefillService:
                     os.unlink(lesson.audio_path)
             except Exception as exc:
                 logger.warning("listening_pool_refill_prepare_failed", error=str(exc))
-                break
+                continue
 
             lessons.append(
                 PooledListeningLesson(

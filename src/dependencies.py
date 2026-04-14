@@ -14,11 +14,15 @@ from src.application.listening_refill_service import ListeningRefillService
 from src.application.listening_service import ListeningAgent
 from src.application.vocab_refill_service import VocabRefillService
 from src.config import Settings
+from src.domain.ports.listening_history_repo import IListeningHistoryRepository
+from src.domain.ports.listening_pool_repo import IListeningPoolRepository
+from src.domain.ports.session_history_repo import ISessionHistoryRepository
 from src.infrastructure.audio import AudioService
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import (
     ArticlePoolRepository,
+    ListeningHistoryRepository,
     ListeningPoolRepository,
     ProfileRepository,
     SessionHistoryRepository,
@@ -69,7 +73,7 @@ class AppProvider(Provider):
     def vocab_pool_repo(self, session: AsyncSession) -> VocabPoolRepository:
         return VocabPoolRepository(session)
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.REQUEST, provides=ISessionHistoryRepository)
     def session_history_repo(self, session: AsyncSession) -> SessionHistoryRepository:
         return SessionHistoryRepository(session)
 
@@ -159,15 +163,19 @@ class AppProvider(Provider):
     ) -> ArticleRefillService:
         return ArticleRefillService(agent=agent, repo=repo)
 
-    @provide(scope=Scope.REQUEST)
+    @provide(scope=Scope.REQUEST, provides=IListeningPoolRepository)
     def listening_pool_repo(self, session: AsyncSession) -> ListeningPoolRepository:
         return ListeningPoolRepository(session)
+
+    @provide(scope=Scope.REQUEST, provides=IListeningHistoryRepository)
+    def listening_history_repo(self, session: AsyncSession) -> ListeningHistoryRepository:
+        return ListeningHistoryRepository(session)
 
     @provide(scope=Scope.REQUEST)
     def listening_refill_service(
         self,
         service: ListeningAgent,
-        repo: ListeningPoolRepository,
+        repo: IListeningPoolRepository,
     ) -> ListeningRefillService:
         return ListeningRefillService(service=service, repo=repo)
 

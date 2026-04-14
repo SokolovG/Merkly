@@ -2,6 +2,7 @@ import uuid
 
 import structlog
 from sqlalchemy import delete, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import PooledListeningLesson
@@ -61,48 +62,63 @@ class ListeningPoolRepository(IListeningPoolRepository):
         row = result.one_or_none()
         await self._db.execute(delete(ListeningPoolModel).where(ListeningPoolModel.id == lesson_id))
         if row:
-            self._db.add(
-                ListeningHistoryModel(
-                    user_id=row.user_id,
-                    episode_url=row.episode_url,
-                    target_lang=row.target_lang,
+            try:
+                self._db.add(
+                    ListeningHistoryModel(
+                        user_id=row.user_id,
+                        episode_url=row.episode_url,
+                        target_lang=row.target_lang,
+                    )
                 )
-            )
-        await self._db.commit()
-
-    async def record_history(self, user_id: uuid.UUID, episode_url: str, target_lang: str) -> None:
-        self._db.add(
-            ListeningHistoryModel(
-                user_id=user_id,
-                episode_url=episode_url,
-                target_lang=target_lang,
-            )
-        )
-        await self._db.commit()
+                await self._db.commit()
+            except IntegrityError:
+                await self._db.rollback()
+        else:
+            await self._db.commit()
 
     async def add_to_pool(self, user_id: uuid.UUID, lessons: list[PooledListeningLesson]) -> None:
-        # Dedup against listening_history (episodes already served to this user)
-        result = await self._db.execute(
+        if not lessons:
+            return
+
+        candidate_urls = [les.episode_url for les in lessons]
+
+        # Dedup against listening_history (already served)
+        history_result = await self._db.execute(
             select(ListeningHistoryModel.episode_url).where(
                 ListeningHistoryModel.user_id == user_id,
-                ListeningHistoryModel.episode_url.in_([les.episode_url for les in lessons]),
+                ListeningHistoryModel.episode_url.in_(candidate_urls),
             )
         )
-        seen_urls = {row for row in result.scalars().all()}
+        seen_urls: set[str] = set(history_result.scalars().all())
 
-        new_rows = [
-            ListeningPoolModel(
-                user_id=user_id,
-                target_lang=lesson.target_lang,
-                episode_url=lesson.episode_url,
-                title=lesson.title,
-                transcript=lesson.transcript,
-                questions=lesson.questions,
-                level=lesson.level,
+        # Dedup against current pool (already queued, e.g. from previous refill)
+        pool_result = await self._db.execute(
+            select(ListeningPoolModel.episode_url).where(
+                ListeningPoolModel.user_id == user_id,
+                ListeningPoolModel.episode_url.in_(candidate_urls),
             )
-            for lesson in lessons
-            if lesson.episode_url not in seen_urls
-        ]
+        )
+        seen_urls |= set(pool_result.scalars().all())
+
+        # In-batch dedup (fetchers are stateless — same episode can appear twice in one batch)
+        seen_in_batch: set[str] = set()
+        new_rows = []
+        for lesson in lessons:
+            if lesson.episode_url in seen_urls or lesson.episode_url in seen_in_batch:
+                continue
+            seen_in_batch.add(lesson.episode_url)
+            new_rows.append(
+                ListeningPoolModel(
+                    user_id=user_id,
+                    target_lang=lesson.target_lang,
+                    episode_url=lesson.episode_url,
+                    title=lesson.title,
+                    transcript=lesson.transcript,
+                    questions=lesson.questions,
+                    level=lesson.level,
+                )
+            )
+
         if new_rows:
             self._db.add_all(new_rows)
             await self._db.commit()

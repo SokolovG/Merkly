@@ -12,10 +12,11 @@ from src.application.agent.core import LessonAgent
 from src.application.listening_refill_service import ListeningRefillService
 from src.application.listening_service import ListeningAgent
 from src.domain.enums import ActivityType
+from src.domain.ports.listening_history_repo import IListeningHistoryRepository
+from src.domain.ports.listening_pool_repo import IListeningPoolRepository
+from src.domain.ports.session_history_repo import ISessionHistoryRepository
 from src.infrastructure.audio import AudioService
 from src.infrastructure.database.repositories import ProfileRepository
-from src.infrastructure.database.repositories.listening_pool_repo import ListeningPoolRepository
-from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.telegram import messages
 
 logger = structlog.get_logger(__name__)
@@ -30,8 +31,9 @@ async def cmd_listen(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
     listening_service: FromDishka[ListeningAgent],
-    session_history_repo: FromDishka[SessionHistoryRepository],
-    listening_pool_repo: FromDishka[ListeningPoolRepository],
+    session_history_repo: FromDishka[ISessionHistoryRepository],
+    listening_pool_repo: FromDishka[IListeningPoolRepository],
+    listening_history_repo: FromDishka[IListeningHistoryRepository],
     listening_refill_service: FromDishka[ListeningRefillService],
     audio_service: FromDishka[AudioService],
 ) -> None:
@@ -52,8 +54,14 @@ async def cmd_listen(
 
     await message.answer(messages.listening_fetching())
 
-    # --- Listening Pool: try pool first ---
+    # --- Listening Pool: try pool first (skip stale entries, try once more before live) ---
     pooled = await listening_pool_repo.get_oldest(profile.id, str(profile.target_lang))
+    if pooled and await session_history_repo.has_seen(profile.id, pooled.episode_url):
+        # Stale entry — discard and try the next one before falling through to live
+        await listening_pool_repo.mark_served(pooled.id)
+        logger.info("cmd_listen_pool_stale", messenger_id=user_id)
+        pooled = await listening_pool_repo.get_oldest(profile.id, str(profile.target_lang))
+
     if pooled and not await session_history_repo.has_seen(profile.id, pooled.episode_url):
         # Pool hit — skip Whisper + podcast search
         await listening_pool_repo.mark_served(pooled.id)
@@ -102,7 +110,7 @@ async def cmd_listen(
             os.unlink(lesson.audio_path)
 
         await session_history_repo.record(profile.id, lesson.episode_url, ActivityType.LISTENING)
-        await listening_pool_repo.record_history(
+        await listening_history_repo.record(
             profile.id, lesson.episode_url, str(profile.target_lang)
         )
         await message.answer(messages.listening_transcribing())  # T23: live path only
