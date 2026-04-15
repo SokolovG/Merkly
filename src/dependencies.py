@@ -108,7 +108,7 @@ class AppProvider(Provider):
         fetcher: NewsArticleFetcher,
         card_gateway: AnkiClient | MochiClient,
     ) -> LessonAgent:
-        return LessonAgent(llm=llm, fetcher=fetcher, anki=card_gateway)
+        return LessonAgent(llm=llm, fetcher=fetcher, card_gateway=card_gateway)
 
     # ── Podcast / Listening ───────────────────────────────────────────────────
 

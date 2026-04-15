@@ -13,8 +13,9 @@ from src.application.listening_refill_service import ListeningRefillService
 from src.application.listening_service import ListeningAgent
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import LANGUAGE_FLAGS
-from src.domain.entities import VocabCard
+from src.domain.entities import UserProfile, VocabCard
 from src.domain.enums import ActivityType
+from src.domain.utils import compute_next_reminder_at
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
 from src.infrastructure.database.repositories.listening_pool_repo import ListeningPoolRepository
@@ -26,30 +27,33 @@ logger = structlog.get_logger(__name__)
 async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
     async with session_factory() as session:
         profile_repo = ProfileRepository(session)
-        profiles = await profile_repo.all_with_reminders()
+        profiles = await profile_repo.get_due_for_reminder()
 
-    now_utc = datetime.now(UTC)
     sent = 0
-
     for profile in profiles:
         try:
-            user_time = now_utc + timedelta(hours=profile.utc_offset)
-            current_hhmm = user_time.strftime("%H:%M")
-
-            if current_hhmm == profile.reminder_time:
-                flag = LANGUAGE_FLAGS.get(profile.target_lang, "🌍")
-                name = lang_name(profile.target_lang)
-                await bot.send_message(
-                    chat_id=profile.messenger_id,
-                    text=(
-                        f"Hey! {flag}\n\n"
-                        f"Time for your daily {name} practice.\n"
-                        "Type /session to start or /vocab for quick vocabulary."
-                    ),
-                )
-                sent += 1
+            flag = LANGUAGE_FLAGS.get(profile.target_lang, "🌍")
+            name = lang_name(profile.target_lang)
+            await bot.send_message(
+                chat_id=profile.messenger_id,
+                text=(
+                    f"Hey! {flag}\n\n"
+                    f"Time for your daily {name} practice.\n"
+                    "Type /session to start or /vocab for quick vocabulary."
+                ),
+            )
+            # Compute and persist next fire time
+            next_at = compute_next_reminder_at(profile.reminder_time, profile.utc_offset)
+            fields = {f: getattr(profile, f) for f in profile.__struct_fields__}
+            fields["next_reminder_at"] = next_at
+            updated = UserProfile(**fields)
+            async with session_factory() as session:
+                repo = ProfileRepository(session)
+                await repo.save(updated)
+            sent += 1
         except Exception as exc:
             logger.warning("scheduler_user_error", job="send_reminders", error=str(exc))
+
     if sent > 0:
         logger.info("scheduler_job_start", job="send_reminders")
         logger.info("scheduler_job_end", job="send_reminders", users_processed=sent)
@@ -101,7 +105,7 @@ async def send_scheduled_vocab(
                 ]
                 deck_id = profile.vocab_scheduler_deck_id or profile.active_deck_id or None
                 for vc in vocab_cards:
-                    await agent._anki.create_card(vc, deck_id=deck_id)
+                    await agent._card_gateway.create_card(vc, deck_id=deck_id)
                 await pool_repo.mark_shown(profile.id, [pc.id for pc in pool_cards])
 
             card_list = "\n".join(
@@ -209,7 +213,7 @@ def setup_scheduler(
     scheduler.add_job(
         send_reminders,
         trigger="cron",
-        minute="*",
+        minute="*/5",
         kwargs={"bot": bot, "session_factory": session_factory},
     )
     scheduler.add_job(

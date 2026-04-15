@@ -11,6 +11,7 @@ from dishka.integrations.aiogram import FromDishka
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import EPISODE_DURATION_OPTIONS, LANGUAGE_FLAGS
 from src.domain.enums import ActivityType, Goal, Language, Level
+from src.domain.utils import compute_next_reminder_at
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import ProfileRepository
@@ -467,6 +468,16 @@ async def handle_toggle(
     else:
         updated = _update_profile(profile, **{field: not getattr(profile, field)})
         return_submenu = _TOGGLE_SUBMENU.get(field, "main")
+        if field == "reminder_enabled":
+            if updated.reminder_enabled:
+                updated = _update_profile(
+                    updated,
+                    next_reminder_at=compute_next_reminder_at(
+                        updated.reminder_time, updated.utc_offset
+                    ),
+                )
+            else:
+                updated = _update_profile(updated, next_reminder_at=None)
 
     await profile_repo.save(updated)
     await callback.answer()
@@ -580,6 +591,11 @@ async def handle_field_input(
         return
     _editing.pop(user_id, None)
     updated = _update_profile(profile, **{field: parsed})
+    if field in ("reminder_time", "utc_offset") and updated.reminder_enabled:
+        updated = _update_profile(
+            updated,
+            next_reminder_at=compute_next_reminder_at(updated.reminder_time, updated.utc_offset),
+        )
     await profile_repo.save(updated)
     if field == "level" and str(profile.level).upper().replace(" ", "") != str(
         parsed

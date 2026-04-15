@@ -7,6 +7,7 @@ from aiogram_dialog import DialogManager
 
 from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, UserProfile
 from src.domain.enums import ActivityType
+from src.domain.utils import compute_next_reminder_at
 from src.infrastructure.database.repositories import ProfileRepository
 
 
@@ -38,5 +39,11 @@ async def save_profile_on_confirm(
             for a in data.get("strategy", ["reading", "writing", "listening", "vocab"])
         ],
     )
+    if profile.reminder_enabled:
+        fields = {f: getattr(profile, f) for f in profile.__struct_fields__}
+        fields["next_reminder_at"] = compute_next_reminder_at(
+            profile.reminder_time, profile.utc_offset
+        )
+        profile = UserProfile(**fields)
     await profile_repo.save(profile)
     await manager.done()

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 import msgspec
 
@@ -35,6 +36,7 @@ class UserProfile(msgspec.Struct):
     vocab_scheduler_deck_id: str = ""  # backend_id of target deck; empty = use active_deck_id
     question_count: int = DEFAULT_QUESTION_COUNT  # Questions per session/listening/writing
     episode_duration_min: int = DEFAULT_EPISODE_DURATION_MIN  # Preferred podcast clip length
+    next_reminder_at: datetime | None = None
     learning_strategy: list[ActivityType] = msgspec.field(
         default_factory=lambda: [
             ActivityType.READING,

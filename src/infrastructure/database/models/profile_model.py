@@ -1,4 +1,6 @@
-from sqlalchemy import BigInteger, Boolean, Integer, Text
+from datetime import datetime
+
+from sqlalchemy import TIMESTAMP, BigInteger, Boolean, Integer, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -31,3 +33,6 @@ class ProfileModel(Base):
     )
     question_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default="3")
     episode_duration_min: Mapped[int] = mapped_column(Integer, nullable=False, server_default="3")
+    next_reminder_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True, default=None
+    )

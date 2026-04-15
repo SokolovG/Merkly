@@ -319,7 +319,7 @@ async def cmd_vocab(
             word_type=pc.word_type,
             article=pc.article,
         )
-        backend_id = await agent._anki.create_card(vc, deck_id=deck_id)
+        backend_id = await agent._card_gateway.create_card(vc, deck_id=deck_id)
         vocab_cards.append(
             VocabCard(
                 word=pc.word,
@@ -575,7 +575,7 @@ async def handle_delete_card(
     cards = _last_cards.get(user_id, [])
     action = callback.data.split(":", 1)[1]  # type: ignore
 
-    gateway: ICardGateway = agent._anki
+    gateway: ICardGateway = agent._card_gateway
 
     if action == "all":
         for card in cards:

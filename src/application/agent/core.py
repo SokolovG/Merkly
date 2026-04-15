@@ -49,11 +49,11 @@ class LessonAgent:
         self,
         llm: ILLMGateway,
         fetcher: IArticleFetcher,
-        anki: ICardGateway,
+        card_gateway: ICardGateway,
     ) -> None:
         self._llm = llm
         self._fetcher = fetcher
-        self._anki = anki
+        self._card_gateway = card_gateway
 
     async def prepare_reading_lesson(
         self,
@@ -66,7 +66,7 @@ class LessonAgent:
     ) -> tuple[str, str, str, list[str]]:
         """Fetch article and generate questions. Returns (title, url, text, questions)."""
         logger.info("lesson_start", level=level, target_lang=target_lang)
-        tools = AgentTools(self._fetcher, self._anki, target_lang)
+        tools = AgentTools(self._fetcher, self._card_gateway, target_lang)
 
         history_note = ""
         if recent_topics:
@@ -191,7 +191,7 @@ class LessonAgent:
         mode: str = "sentences",
     ) -> tuple[str, list[VocabCard]]:
         """Review student writing, give feedback, create cards for mistakes."""
-        tools = AgentTools(self._fetcher, self._anki, target_lang)
+        tools = AgentTools(self._fetcher, self._card_gateway, target_lang)
         messages = [
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(
@@ -235,7 +235,7 @@ class LessonAgent:
 
         pool_mode=True: collect cards only, skip backend (Anki/Mochi) — used by VocabRefillService.
         """
-        tools = AgentTools(self._fetcher, self._anki, target_lang, pool_mode=pool_mode)
+        tools = AgentTools(self._fetcher, self._card_gateway, target_lang, pool_mode=pool_mode)
         messages = [
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(
@@ -276,7 +276,7 @@ class LessonAgent:
         target_lang: str,
     ) -> list[VocabCard]:
         """Fetch article and create vocabulary flashcards without Q&A."""
-        tools = AgentTools(self._fetcher, self._anki, target_lang)
+        tools = AgentTools(self._fetcher, self._card_gateway, target_lang)
         messages = [
             Message(role="system", content=build_system_prompt(target_lang)),
             Message(role="user", content=build_vocab_prompt(level, target_lang, native_lang)),
@@ -351,7 +351,7 @@ class LessonAgent:
         )
 
         try:
-            backend_id = await self._anki.create_card(card, deck_id=deck_id)
+            backend_id = await self._card_gateway.create_card(card, deck_id=deck_id)
         except CardBackendError as e:
             raise WordCaptureError(f"Card backend failed for '{word}': {e}") from e
         logger.info("word_captured", word_type=card.word_type)

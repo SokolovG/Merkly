@@ -41,6 +41,7 @@ class ProfileRepository(IProfileRepository):
             ],
             question_count=row.question_count,
             episode_duration_min=row.episode_duration_min,
+            next_reminder_at=row.next_reminder_at,
             id=row.id,
         )
 
@@ -65,6 +66,7 @@ class ProfileRepository(IProfileRepository):
             "learning_strategy": [str(a) for a in profile.learning_strategy],
             "question_count": profile.question_count,
             "episode_duration_min": profile.episode_duration_min,
+            "next_reminder_at": profile.next_reminder_at,
         }
 
     async def get(self, messenger_id: int) -> UserProfile | None:
@@ -93,5 +95,18 @@ class ProfileRepository(IProfileRepository):
     async def all_with_reminders(self) -> list[UserProfile]:
         result = await self._session.execute(
             select(ProfileModel).where(ProfileModel.reminder_enabled == True)  # noqa: E712
+        )
+        return [self._to_domain(row) for row in result.scalars().all()]
+
+    async def get_due_for_reminder(self) -> list[UserProfile]:
+        from datetime import UTC, datetime
+
+        now = datetime.now(UTC)
+        result = await self._session.execute(
+            select(ProfileModel).where(
+                ProfileModel.reminder_enabled == True,  # noqa: E712
+                ProfileModel.next_reminder_at.is_not(None),
+                ProfileModel.next_reminder_at <= now,
+            )
         )
         return [self._to_domain(row) for row in result.scalars().all()]

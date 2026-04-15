@@ -15,3 +15,6 @@ class IProfileRepository(ABC):
 
     @abstractmethod
     async def all_with_reminders(self) -> list[UserProfile]: ...
+
+    @abstractmethod
+    async def get_due_for_reminder(self) -> list[UserProfile]: ...

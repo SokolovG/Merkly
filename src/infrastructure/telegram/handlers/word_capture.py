@@ -86,7 +86,7 @@ async def handle_word_capture(
     # Fallback: query backend for users who selected deck before decks were persisted
     if deck_name is None and profile.active_deck_id:
         try:
-            decks = await agent._anki.list_decks()
+            decks = await agent._card_gateway.list_decks()
             deck_name = next(
                 (name for name, bid in decks if bid == profile.active_deck_id),
                 None,
@@ -163,7 +163,7 @@ async def handle_regen_context(
 
     if old_card.backend_id:
         with contextlib.suppress(Exception):
-            await agent._anki.delete_card(old_card.backend_id)
+            await agent._card_gateway.delete_card(old_card.backend_id)
 
     await message.reply(regenerating(word), parse_mode="HTML")
 

@@ -47,6 +47,8 @@ python-version = "3.12"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["integration: requires a real Postgres database (TEST_DATABASE_URL)"]
+env = ["TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/merkly_test"]
 
 [dependency-groups]
 dev = [
@@ -55,5 +57,6 @@ dev = [
     "pre-commit>=3.8",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-env>=1.1",
     "respx>=0.21",
 ]
