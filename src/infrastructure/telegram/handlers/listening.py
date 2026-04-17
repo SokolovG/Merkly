@@ -11,12 +11,13 @@ from dishka.integrations.aiogram import FromDishka
 from src.application.agent.core import LessonAgent
 from src.application.listening_refill_service import ListeningRefillService
 from src.application.listening_service import ListeningAgent
-from src.domain.enums import ActivityType
+from src.domain.enums import ActivityType, Platform
 from src.domain.ports.listening_history_repo import IListeningHistoryRepository
 from src.domain.ports.listening_pool_repo import IListeningPoolRepository
 from src.domain.ports.session_history_repo import ISessionHistoryRepository
 from src.infrastructure.audio import AudioService
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.telegram import messages
 
 logger = structlog.get_logger(__name__)
@@ -30,6 +31,7 @@ _pending_listening: dict[int, dict] = {}
 async def cmd_listen(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     listening_service: FromDishka[ListeningAgent],
     session_history_repo: FromDishka[ISessionHistoryRepository],
     listening_pool_repo: FromDishka[IListeningPoolRepository],
@@ -39,7 +41,8 @@ async def cmd_listen(
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
 
     if not profile:
         await message.answer(messages.no_profile())

@@ -8,8 +8,9 @@ from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.text import Const
 
 from src.config import Settings
-from src.domain.enums import MessengerType
+from src.domain.enums import Platform
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.telegram.messages import (
     bug_report_prompt,
     bug_report_sent,
@@ -31,13 +32,15 @@ async def on_bug_report(
 
     container = manager.middleware_data["dishka_container"]
     profile_repo: ProfileRepository = await container.get(ProfileRepository)
+    identity_repo: IdentityRepository = await container.get(IdentityRepository)
     settings: Settings = await container.get(Settings)
     bot: Bot = manager.middleware_data["bot"]
 
     if message.from_user is None or message.from_user.id is None:
         return
     user_id = message.from_user.id
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await message.answer("Profile not found.")
         await manager.done()
@@ -49,7 +52,7 @@ async def on_bug_report(
     header = f"🐛 Bug Report\nFrom: {user_id} (@{username})\n\n"
 
     # If Telegram and BUG_REPORT_CHAT_ID configured → forward to admin chat
-    if profile.messenger_type == MessengerType.TELEGRAM and settings.BUG_REPORT_CHAT_ID:
+    if settings.BUG_REPORT_CHAT_ID:
         admin_chat_id = int(settings.BUG_REPORT_CHAT_ID)
 
         if message.text:

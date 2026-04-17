@@ -1,10 +1,12 @@
+import uuid
+
 import structlog
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import UserDeck, UserProfile
-from src.domain.enums import ActivityType, Goal, Language, MessengerType
+from src.domain.enums import ActivityType, Goal, Language
 from src.domain.ports.profile_repo import IProfileRepository
 from src.infrastructure.database.models.profile_model import ProfileModel
 
@@ -18,8 +20,6 @@ class ProfileRepository(IProfileRepository):
     def _to_domain(self, row: ProfileModel) -> UserProfile:
         decks = [UserDeck(**d) for d in (row.decks or [])]
         return UserProfile(
-            messenger_id=row.messenger_id,
-            messenger_type=MessengerType(row.messenger_type),
             username=row.username,
             level=row.level,
             goal=Goal(row.goal),
@@ -47,8 +47,6 @@ class ProfileRepository(IProfileRepository):
 
     def _to_values(self, profile: UserProfile) -> dict:
         return {
-            "messenger_id": profile.messenger_id,
-            "messenger_type": str(profile.messenger_type),
             "username": profile.username,
             "level": str(profile.level),
             "goal": str(profile.goal),
@@ -69,24 +67,21 @@ class ProfileRepository(IProfileRepository):
             "next_reminder_at": profile.next_reminder_at,
         }
 
-    async def get(self, messenger_id: int) -> UserProfile | None:
-        result = await self._session.execute(
-            select(ProfileModel).where(ProfileModel.messenger_id == messenger_id)
-        )
+    async def get_by_id(self, user_id: uuid.UUID) -> UserProfile | None:
+        result = await self._session.execute(select(ProfileModel).where(ProfileModel.id == user_id))
         row = result.scalar_one_or_none()
-        profile = self._to_domain(row) if row else None
-        return profile
+        return self._to_domain(row) if row else None
 
     async def save(self, profile: UserProfile) -> None:
         values = {**self._to_values(profile), "id": profile.id}
         stmt = pg_insert(ProfileModel).values(**values)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["messenger_id"],
-            set_={k: stmt.excluded[k] for k in values if k not in ("messenger_id", "id")},
+            index_elements=["id"],
+            set_={k: stmt.excluded[k] for k in values if k != "id"},
         )
         await self._session.execute(stmt)
         await self._session.commit()
-        logger.debug("db_save", table="profiles", messenger_id=profile.messenger_id)
+        logger.debug("db_save", table="profiles", user_id=str(profile.id))
 
     async def all(self) -> list[UserProfile]:
         result = await self._session.execute(select(ProfileModel))

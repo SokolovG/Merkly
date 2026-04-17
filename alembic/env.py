@@ -15,6 +15,7 @@ from src.infrastructure.database.models import (
     VocabHistoryModel,  # noqa
     VocabPoolModel,  # noqa
     ListeningHistoryModel,  # noqa
+    IdentityModel,  # noqa
 )
 
 

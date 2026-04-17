@@ -10,7 +10,6 @@ from src.domain.enums import Goal, Language, WordType
 
 def _make_profile() -> UserProfile:
     return UserProfile(
-        messenger_id=1,
         username="test",
         level="B1",
         goal=Goal.TRAVEL,

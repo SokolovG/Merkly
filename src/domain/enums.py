@@ -107,5 +107,10 @@ class ActivityType(StrEnum):
     VOCAB = "vocab"
 
 
-class MessengerType(StrEnum):
+class Platform(StrEnum):
     TELEGRAM = "telegram"
+    WEB = "web"
+
+
+# Deprecated alias — remove after all references updated
+MessengerType = Platform

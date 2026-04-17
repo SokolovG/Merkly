@@ -22,6 +22,7 @@ from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import (
     ArticlePoolRepository,
+    IdentityRepository,
     ListeningHistoryRepository,
     ListeningPoolRepository,
     ProfileRepository,
@@ -60,6 +61,10 @@ class AppProvider(Provider):
             except Exception:
                 await session.rollback()
                 raise
+
+    @provide(scope=Scope.REQUEST)
+    def identity_repo(self, session: AsyncSession) -> IdentityRepository:
+        return IdentityRepository(session)
 
     @provide(scope=Scope.REQUEST)
     def profile_repo(self, session: AsyncSession) -> ProfileRepository:

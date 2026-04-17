@@ -17,10 +17,11 @@ from src.application.agent.prompts import lang_name
 from src.application.article_refill_service import ArticleRefillService
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.entities import Session, VocabCard
-from src.domain.enums import ActivityType
+from src.domain.enums import ActivityType, Platform
 from src.domain.ports.card_gateway import ICardGateway
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
 from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.telegram.messages import (
@@ -101,11 +102,13 @@ async def cmd_start(
     message: Message,
     dialog_manager: DialogManager,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
     _pending_sessions.pop(user_id, None)
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if profile:
         structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
         logger.info("cmd_start", messenger_id=user_id)
@@ -123,6 +126,7 @@ async def cmd_start(
 async def cmd_session(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     session_repo: FromDishka[SessionRepository],
     session_history_repo: FromDishka[SessionHistoryRepository],
     agent: FromDishka[LessonAgent],
@@ -131,8 +135,11 @@ async def cmd_session(
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
-    profile = await profile_repo.get(user_id)
-
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    if not identity:
+        await message.answer(no_profile())
+        return
+    profile = await profile_repo.get_by_id(identity.user_id)
     if not profile:
         await message.answer(no_profile())
         return
@@ -220,13 +227,18 @@ async def cmd_session(
 async def cmd_vocab(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     agent: FromDishka[LessonAgent],
     pool_repo: FromDishka[VocabPoolRepository],
     refill_service: FromDishka[VocabRefillService],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    if not identity:
+        await message.answer(no_profile())
+        return
+    profile = await profile_repo.get_by_id(identity.user_id)
     if not profile:
         await message.answer(no_profile())
         return
@@ -347,11 +359,16 @@ async def cmd_vocab(
 async def cmd_repeat(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     pool_repo: FromDishka[VocabPoolRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    if not identity:
+        await message.answer(no_profile())
+        return
+    profile = await profile_repo.get_by_id(identity.user_id)
     if not profile:
         await message.answer(no_profile())
         return
@@ -374,11 +391,16 @@ async def cmd_repeat(
 async def cmd_clearvocab(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     pool_repo: FromDishka[VocabPoolRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = message.from_user.id  # type: ignore
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    if not identity:
+        await message.answer(no_profile())
+        return
+    profile = await profile_repo.get_by_id(identity.user_id)
     if not profile:
         await message.answer(no_profile())
         return
@@ -398,9 +420,14 @@ async def cmd_clearvocab(
 async def cmd_help(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
-    profile = await profile_repo.get(message.from_user.id) if message.from_user else None
+    if message.from_user:
+        identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(message.from_user.id))
+        profile = await profile_repo.get_by_id(identity.user_id) if identity else None
+    else:
+        profile = None
     if profile and message.from_user:
         structlog.contextvars.bind_contextvars(
             user_id=str(profile.id), messenger_id=message.from_user.id
@@ -431,6 +458,7 @@ async def cmd_exit(message: Message) -> None:
 async def handle_answer(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     session_repo: FromDishka[SessionRepository],
     agent: FromDishka[LessonAgent],
 ) -> None:
@@ -460,7 +488,8 @@ async def handle_answer(
     response = f"📝 <b>Feedback:</b>\n\n{escape(feedback)}"
 
     # Offer writing exercise only if WRITING is in the user's strategy
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if profile is not None:
         structlog.contextvars.bind_contextvars(user_id=str(profile.id), messenger_id=user_id)
     logger.info("answer_received", messenger_id=user_id)
@@ -492,10 +521,10 @@ async def handle_answer(
     else:
         await message.answer(response, parse_mode="HTML")
 
-    # Save session
+    # Save session (profile.id used; fallback uuid is never saved since guard below is None)
     session = Session(
         session_id=ctx["session_id"],
-        user_id=user_id,
+        user_id=profile.id if profile else uuid.uuid4(),
         date=datetime.now().isoformat(),
         article_url=ctx["url"],
         article_title=ctx["title"],

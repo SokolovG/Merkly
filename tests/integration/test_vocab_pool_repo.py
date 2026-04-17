@@ -11,9 +11,8 @@ from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRe
 pytestmark = pytest.mark.integration
 
 
-def _make_profile(messenger_id: int) -> UserProfile:
+def _make_profile() -> UserProfile:
     return UserProfile(
-        messenger_id=messenger_id,
         username="vocabuser",
         level="B1",
         goal=Goal.TRAVEL,
@@ -33,7 +32,7 @@ def _make_card(word: str) -> VocabCard:
 
 async def test_pool_count_empty(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=62345)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     repo = VocabPoolRepository(db_session)
@@ -43,7 +42,7 @@ async def test_pool_count_empty(db_session: AsyncSession) -> None:
 
 async def test_add_to_pool_and_count(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=62346)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     repo = VocabPoolRepository(db_session)
@@ -56,7 +55,7 @@ async def test_add_to_pool_and_count(db_session: AsyncSession) -> None:
 
 async def test_get_pool_cards_order(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=62347)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     repo = VocabPoolRepository(db_session)
@@ -72,7 +71,7 @@ async def test_get_pool_cards_order(db_session: AsyncSession) -> None:
 
 async def test_mark_shown_moves_to_history(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=62348)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     repo = VocabPoolRepository(db_session)
@@ -96,7 +95,7 @@ async def test_mark_shown_moves_to_history(db_session: AsyncSession) -> None:
 
 async def test_clear_pool(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=62349)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     repo = VocabPoolRepository(db_session)
@@ -112,7 +111,7 @@ async def test_clear_pool(db_session: AsyncSession) -> None:
 
 async def test_add_to_pool_dedup(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=62350)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     repo = VocabPoolRepository(db_session)

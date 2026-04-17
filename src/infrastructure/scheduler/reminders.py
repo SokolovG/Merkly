@@ -14,10 +14,11 @@ from src.application.listening_service import ListeningAgent
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import LANGUAGE_FLAGS
 from src.domain.entities import UserProfile, VocabCard
-from src.domain.enums import ActivityType
+from src.domain.enums import ActivityType, Platform
 from src.domain.utils import compute_next_reminder_at
 from src.infrastructure.database.repositories import ProfileRepository
 from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.database.repositories.listening_pool_repo import ListeningPoolRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 
@@ -32,10 +33,19 @@ async def send_reminders(bot: Bot, session_factory: async_sessionmaker) -> None:
     sent = 0
     for profile in profiles:
         try:
+            async with session_factory() as session:
+                identity = await IdentityRepository(session).get_by_user_id(
+                    profile.id, Platform.TELEGRAM
+                )
+            if not identity:
+                logger.warning(
+                    "scheduler_no_contact", job="send_reminders", user_id=str(profile.id)
+                )
+                continue
             flag = LANGUAGE_FLAGS.get(profile.target_lang, "🌍")
             name = lang_name(profile.target_lang)
             await bot.send_message(
-                chat_id=profile.messenger_id,
+                chat_id=int(identity.platform_user_id),
                 text=(
                     f"Hey! {flag}\n\n"
                     f"Time for your daily {name} practice.\n"
@@ -108,11 +118,20 @@ async def send_scheduled_vocab(
                     await agent._card_gateway.create_card(vc, deck_id=deck_id)
                 await pool_repo.mark_shown(profile.id, [pc.id for pc in pool_cards])
 
+            async with session_factory() as _cs:
+                identity = await IdentityRepository(_cs).get_by_user_id(
+                    profile.id, Platform.TELEGRAM
+                )
+            if not identity:
+                logger.warning(
+                    "scheduler_no_contact", job="send_scheduled_vocab", user_id=str(profile.id)
+                )
+                continue
             card_list = "\n".join(
                 f"• <b>{escape(c.word)}</b> — {escape(c.translation)}" for c in vocab_cards
             )
             await bot.send_message(
-                chat_id=profile.messenger_id,
+                chat_id=int(identity.platform_user_id),
                 text=f"🃏 <b>Daily vocab</b>\n\n{card_list}",
                 parse_mode="HTML",
             )

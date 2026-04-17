@@ -1,4 +1,5 @@
 from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.database.repositories.listening_history_repo import (
     ListeningHistoryRepository,
 )
@@ -10,6 +11,7 @@ from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRe
 
 __all__ = [
     "ArticlePoolRepository",
+    "IdentityRepository",
     "ListeningHistoryRepository",
     "ListeningPoolRepository",
     "ProfileRepository",

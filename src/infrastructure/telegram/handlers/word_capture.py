@@ -8,8 +8,10 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.application.agent.core import LessonAgent
 from src.domain.entities import VocabCard
+from src.domain.enums import Platform
 from src.domain.exceptions import AppError, WordCaptureError
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.telegram.messages import (
     ask_for_context,
     card_saved,
@@ -51,6 +53,7 @@ async def handle_word_capture(
     message: Message,
     agent: FromDishka[LessonAgent],
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     if message.from_user is None:
@@ -69,7 +72,8 @@ async def handle_word_capture(
         await message.reply(word_empty(), parse_mode="HTML")
         return
 
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await message.reply(complete_setup())
         return

@@ -10,11 +10,12 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.application.vocab_refill_service import VocabRefillService
 from src.domain.constants import EPISODE_DURATION_OPTIONS, LANGUAGE_FLAGS
-from src.domain.enums import ActivityType, Goal, Language, Level
+from src.domain.enums import ActivityType, Goal, Language, Level, Platform
 from src.domain.utils import compute_next_reminder_at
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.exceptions import CardBackendError
 from src.infrastructure.telegram.messages import complete_setup
@@ -347,11 +348,16 @@ def _parse_value(field: str, raw: str):
 
 
 @settings_router.message(Command("settings"))
-async def cmd_settings(message: Message, profile_repo: FromDishka[ProfileRepository]) -> None:
+async def cmd_settings(
+    message: Message,
+    profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
+) -> None:
     structlog.contextvars.clear_contextvars()
     if message.from_user is None:
         return
-    profile = await profile_repo.get(message.from_user.id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(message.from_user.id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await message.reply(complete_setup())
         return
@@ -370,10 +376,12 @@ async def cmd_settings(message: Message, profile_repo: FromDishka[ProfileReposit
 async def handle_nav(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     submenu = (callback.data or "").split(":", 1)[1]
-    profile = await profile_repo.get(callback.from_user.id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(callback.from_user.id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await callback.answer("Profile not found.")
         return
@@ -404,6 +412,7 @@ async def handle_edit_button(callback: CallbackQuery) -> None:
 async def handle_pick(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     # setpick:{field}:{value}
@@ -413,7 +422,8 @@ async def handle_pick(
         return
     _, field, raw_value = parts
     user_id = callback.from_user.id
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await callback.answer("Profile not found.")
         return
@@ -437,11 +447,13 @@ async def handle_pick(
 async def handle_toggle(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     field = (callback.data or "").split(":", 1)[1]
     user_id = callback.from_user.id
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await callback.answer("Profile not found.")
         return
@@ -491,10 +503,12 @@ async def handle_sched_pickdeck(
     callback: CallbackQuery,
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = callback.from_user.id
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await callback.answer("Profile not found.")
         return
@@ -531,6 +545,7 @@ async def handle_sched_pickdeck(
 async def handle_sched_deck_callback(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = callback.from_user.id
@@ -548,7 +563,8 @@ async def handle_sched_deck_callback(
         return
     _, backend_id = decks[idx]
     _waiting_deck.pop(user_id, None)
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await callback.answer("Profile not found.")
         return
@@ -567,6 +583,7 @@ async def handle_sched_deck_callback(
 async def handle_field_input(
     message: Message,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
     vocab_pool_repo: FromDishka[VocabPoolRepository],
     refill_service: FromDishka[VocabRefillService],
 ) -> None:
@@ -578,7 +595,8 @@ async def handle_field_input(
     if not edit_state:
         return
     field, return_submenu = edit_state
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await message.reply(complete_setup())
         _editing.pop(user_id, None)

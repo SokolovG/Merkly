@@ -10,9 +10,8 @@ from src.infrastructure.database.repositories.profile_repo import ProfileReposit
 pytestmark = pytest.mark.integration
 
 
-def _make_profile(messenger_id: int, reminder_enabled: bool = False) -> UserProfile:
+def _make_profile(reminder_enabled: bool = False) -> UserProfile:
     return UserProfile(
-        messenger_id=messenger_id,
         username="testuser",
         level="B1",
         goal=Goal.TRAVEL,
@@ -24,12 +23,12 @@ def _make_profile(messenger_id: int, reminder_enabled: bool = False) -> UserProf
 
 async def test_save_and_get(db_session: AsyncSession) -> None:
     repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=12345)
+    profile = _make_profile()
     await repo.save(profile)
 
-    result = await repo.get(12345)
+    result = await repo.get_by_id(profile.id)
     assert result is not None
-    assert result.messenger_id == 12345
+    assert result.id == profile.id
     assert result.level == "B1"
     assert result.goal == Goal.TRAVEL
     assert result.native_lang == Language.EN
@@ -37,38 +36,45 @@ async def test_save_and_get(db_session: AsyncSession) -> None:
 
 
 async def test_get_nonexistent_returns_none(db_session: AsyncSession) -> None:
+    import uuid
+
     repo = ProfileRepository(db_session)
-    result = await repo.get(99999)
+    result = await repo.get_by_id(uuid.uuid4())
     assert result is None
 
 
 async def test_save_is_upsert(db_session: AsyncSession) -> None:
     repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=22345)
+    profile = _make_profile()
     await repo.save(profile)
 
-    profile.level = "B2"
-    await repo.save(profile)
+    fields = {f: getattr(profile, f) for f in profile.__struct_fields__}
+    fields["level"] = "B2"
+    updated = UserProfile(**fields)
+    await repo.save(updated)
 
-    result = await repo.get(22345)
+    result = await repo.get_by_id(profile.id)
     assert result is not None
     assert result.level == "B2"
 
 
 async def test_all_with_reminders_filter(db_session: AsyncSession) -> None:
     repo = ProfileRepository(db_session)
-    await repo.save(_make_profile(messenger_id=32345, reminder_enabled=True))
-    await repo.save(_make_profile(messenger_id=32346, reminder_enabled=False))
+    reminder_profile = _make_profile(reminder_enabled=True)
+    await repo.save(reminder_profile)
+    await repo.save(_make_profile(reminder_enabled=False))
 
     results = await repo.all_with_reminders()
-    assert len(results) == 1
-    assert results[0].messenger_id == 32345
+    result_ids = {r.id for r in results}
+    assert reminder_profile.id in result_ids
 
 
 async def test_all(db_session: AsyncSession) -> None:
     repo = ProfileRepository(db_session)
-    await repo.save(_make_profile(messenger_id=42345))
-    await repo.save(_make_profile(messenger_id=42346))
+    p1 = _make_profile()
+    p2 = _make_profile()
+    await repo.save(p1)
+    await repo.save(p2)
 
     results = await repo.all()
     assert len(results) >= 2

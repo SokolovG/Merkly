@@ -13,9 +13,8 @@ from src.infrastructure.database.repositories.session_repo import SessionReposit
 pytestmark = pytest.mark.integration
 
 
-def _make_profile(messenger_id: int) -> UserProfile:
+def _make_profile() -> UserProfile:
     return UserProfile(
-        messenger_id=messenger_id,
         username="sessionuser",
         level="B1",
         goal=Goal.TRAVEL,
@@ -27,7 +26,7 @@ def _make_profile(messenger_id: int) -> UserProfile:
 def _make_session(session_id: str) -> Session:
     return Session(
         session_id=session_id,
-        user_id=0,  # overridden by repo.save user_id param
+        user_id=uuid.uuid4(),  # overridden by repo.save user_id param
         date="2025-01-01",
         article_url=f"https://example.com/article-{session_id}",
         article_title="Test Article",
@@ -48,7 +47,7 @@ def _make_session(session_id: str) -> Session:
 
 async def test_save_and_get_recent(db_session: AsyncSession) -> None:
     repo = SessionRepository(db_session)
-    profile = _make_profile(messenger_id=52345)
+    profile = _make_profile()
     await ProfileRepository(db_session).save(profile)
 
     session = _make_session(session_id=str(uuid.uuid4()))
@@ -64,7 +63,7 @@ async def test_save_and_get_recent(db_session: AsyncSession) -> None:
 async def test_get_recent_limit(db_session: AsyncSession) -> None:
     session_repo = SessionRepository(db_session)
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=52346)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     saved_ids: list[str] = []
@@ -82,7 +81,7 @@ async def test_get_recent_limit(db_session: AsyncSession) -> None:
 
 async def test_get_recent_empty(db_session: AsyncSession) -> None:
     profile_repo = ProfileRepository(db_session)
-    profile = _make_profile(messenger_id=52347)
+    profile = _make_profile()
     await profile_repo.save(profile)
 
     session_repo = SessionRepository(db_session)

@@ -5,10 +5,11 @@ import structlog
 from aiogram.types import CallbackQuery
 from aiogram_dialog import DialogManager
 
-from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, UserProfile
-from src.domain.enums import ActivityType
+from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, Identity, UserProfile
+from src.domain.enums import ActivityType, Platform
 from src.domain.utils import compute_next_reminder_at
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 
 
 async def save_profile_on_confirm(
@@ -18,12 +19,12 @@ async def save_profile_on_confirm(
     structlog.contextvars.clear_contextvars()
     container = manager.middleware_data["dishka_container"]
     profile_repo: ProfileRepository = await container.get(ProfileRepository)
+    identity_repo: IdentityRepository = await container.get(IdentityRepository)
 
     data = manager.dialog_data
     user = callback.from_user
 
     profile = UserProfile(
-        messenger_id=user.id,
         username=user.username,
         level=data.get("level", "B1"),
         goal=data.get("goal", "general"),
@@ -46,4 +47,10 @@ async def save_profile_on_confirm(
         )
         profile = UserProfile(**fields)
     await profile_repo.save(profile)
+    identity = Identity(
+        user_id=profile.id,
+        platform=Platform.TELEGRAM,
+        platform_user_id=str(user.id),
+    )
+    await identity_repo.save(identity)
     await manager.done()

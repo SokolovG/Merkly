@@ -1,3 +1,4 @@
+import uuid
 from abc import ABC, abstractmethod
 
 from src.domain.entities import UserProfile
@@ -5,7 +6,7 @@ from src.domain.entities import UserProfile
 
 class IProfileRepository(ABC):
     @abstractmethod
-    async def get(self, messenger_id: int) -> UserProfile | None: ...
+    async def get_by_id(self, user_id: uuid.UUID) -> UserProfile | None: ...
 
     @abstractmethod
     async def save(self, profile: UserProfile) -> None: ...

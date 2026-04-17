@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.domain.entities import Session, VocabCard
 from src.domain.enums import WordType
 from src.domain.ports.session_repo import ISessionRepository
-from src.infrastructure.database.models.profile_model import ProfileModel
 from src.infrastructure.database.models.session_model import SessionModel
 
 
@@ -15,7 +14,7 @@ class SessionRepository(ISessionRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._db = session
 
-    def _to_domain(self, row: SessionModel, messenger_id: int) -> Session:
+    def _to_domain(self, row: SessionModel) -> Session:
         cards = [
             VocabCard(
                 word=d["word"],
@@ -29,7 +28,7 @@ class SessionRepository(ISessionRepository):
         ]
         return Session(
             session_id=row.session_id,
-            user_id=messenger_id,
+            user_id=row.user_id,
             date=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
             article_url=row.article_url,
             article_title=row.article_title,
@@ -77,11 +76,9 @@ class SessionRepository(ISessionRepository):
 
     async def get_recent(self, user_id: uuid.UUID, limit: int = 3) -> list[Session]:
         result = await self._db.execute(
-            select(SessionModel, ProfileModel.messenger_id)
-            .join(ProfileModel, SessionModel.user_id == ProfileModel.id)
-            .where(ProfileModel.id == user_id)
+            select(SessionModel)
+            .where(SessionModel.user_id == user_id)
             .order_by(SessionModel.created_at.desc())
             .limit(limit)
         )
-        rows = result.all()
-        return [self._to_domain(row, mid) for row, mid in rows]
+        return [self._to_domain(row) for row in result.scalars().all()]

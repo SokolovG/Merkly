@@ -4,11 +4,18 @@ from datetime import datetime
 import msgspec
 
 from src.domain.constants import DEFAULT_EPISODE_DURATION_MIN, DEFAULT_QUESTION_COUNT
-from src.domain.enums import ActivityType, Goal, Language, MessengerType, WordType
+from src.domain.enums import ActivityType, Goal, Language, Platform, WordType
 
 DEFAULT_VOCAB_CARD_COUNT = 8
 DEFAULT_REMINDER_TIME = "11:00"
 DEFAULT_VOCAB_SCHEDULER_TIME = "09:00"
+
+
+class Identity(msgspec.Struct):
+    user_id: uuid.UUID
+    platform: Platform
+    platform_user_id: str
+    id: uuid.UUID = msgspec.field(default_factory=uuid.uuid4)
 
 
 class UserDeck(msgspec.Struct):
@@ -17,13 +24,11 @@ class UserDeck(msgspec.Struct):
 
 
 class UserProfile(msgspec.Struct):
-    messenger_id: int
     username: str | None
     level: str
     goal: Goal
     native_lang: Language
     target_lang: Language = Language.DE
-    messenger_type: MessengerType = MessengerType.TELEGRAM
     reminder_enabled: bool = False
     reminder_time: str = DEFAULT_REMINDER_TIME
     utc_offset: int = 0
@@ -91,7 +96,7 @@ class PooledListeningLesson(msgspec.Struct):
 
 class Session(msgspec.Struct):
     session_id: str
-    user_id: int
+    user_id: uuid.UUID
     date: str
     article_url: str
     article_title: str

@@ -4,9 +4,11 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from dishka.integrations.aiogram import FromDishka
 
 from src.domain.entities import UserDeck
+from src.domain.enums import Platform
 from src.infrastructure.card_backends.anki import AnkiClient
 from src.infrastructure.card_backends.mochi import MochiClient
 from src.infrastructure.database.repositories import ProfileRepository
+from src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from src.infrastructure.exceptions import CardBackendError
 from src.infrastructure.telegram.messages import (
     complete_setup,
@@ -43,11 +45,13 @@ async def _create_deck(
     name: str,
     card_gateway: AnkiClient | MochiClient,
     profile_repo: ProfileRepository,
+    identity_repo: IdentityRepository,
 ) -> None:
     if message.from_user is None:
         return
     user_id = message.from_user.id
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await message.reply(complete_setup())
         return
@@ -77,6 +81,7 @@ async def handle_newdeck(
     message: Message,
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     if message.from_user is None:
@@ -91,7 +96,7 @@ async def handle_newdeck(
 
     name = parts[1].strip()
     _pending_newdeck.discard(user_id)
-    await _create_deck(message, name, card_gateway, profile_repo)
+    await _create_deck(message, name, card_gateway, profile_repo, identity_repo)
 
 
 @deck_router.message(lambda msg: msg.from_user is not None and msg.from_user.id in _pending_newdeck)
@@ -99,6 +104,7 @@ async def handle_newdeck_name(
     message: Message,
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     if message.from_user is None or not message.text:
@@ -106,7 +112,7 @@ async def handle_newdeck_name(
     user_id = message.from_user.id
     name = message.text.strip()
     _pending_newdeck.discard(user_id)
-    await _create_deck(message, name, card_gateway, profile_repo)
+    await _create_deck(message, name, card_gateway, profile_repo, identity_repo)
 
 
 @deck_router.message(F.text == "/setdeck")
@@ -114,13 +120,15 @@ async def handle_setdeck(
     message: Message,
     card_gateway: FromDishka[AnkiClient | MochiClient],
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     if message.from_user is None:
         return
     user_id = message.from_user.id
 
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await message.reply(complete_setup())
         return
@@ -147,6 +155,7 @@ async def handle_setdeck(
 async def handle_setdeck_callback(
     callback: CallbackQuery,
     profile_repo: FromDishka[ProfileRepository],
+    identity_repo: FromDishka[IdentityRepository],
 ) -> None:
     structlog.contextvars.clear_contextvars()
     user_id = callback.from_user.id
@@ -168,7 +177,8 @@ async def handle_setdeck_callback(
     display_name, backend_id = decks[idx]
     _pending_setdeck.pop(user_id, None)
 
-    profile = await profile_repo.get(user_id)
+    identity = await identity_repo.get_by_platform(Platform.TELEGRAM, str(user_id))
+    profile = await profile_repo.get_by_id(identity.user_id) if identity else None
     if not profile:
         await callback.answer("Profile not found.")
         return
