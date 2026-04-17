@@ -2,7 +2,6 @@ import uuid
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import Identity
@@ -26,17 +25,24 @@ class IdentityRepository(IIdentityRepository):
         )
 
     async def save(self, identity: Identity) -> None:
-        stmt = pg_insert(IdentityModel).values(
-            id=identity.id,
-            user_id=identity.user_id,
-            platform=str(identity.platform),
-            platform_user_id=identity.platform_user_id,
+        result = await self._session.execute(
+            select(IdentityModel).where(
+                IdentityModel.platform == str(identity.platform),
+                IdentityModel.platform_user_id == identity.platform_user_id,
+            )
         )
-        stmt = stmt.on_conflict_do_update(
-            constraint="identities_platform_platform_user_id_key",
-            set_={"user_id": stmt.excluded.user_id},
-        )
-        await self._session.execute(stmt)
+        existing = result.scalar_one_or_none()
+        if existing is None:
+            self._session.add(
+                IdentityModel(
+                    id=identity.id,
+                    user_id=identity.user_id,
+                    platform=str(identity.platform),
+                    platform_user_id=identity.platform_user_id,
+                )
+            )
+        else:
+            existing.user_id = identity.user_id
         await self._session.commit()
 
     async def get_by_platform(self, platform: Platform, platform_user_id: str) -> Identity | None:

@@ -1,7 +1,6 @@
 import uuid
 
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import Session, VocabCard
@@ -66,12 +65,15 @@ class SessionRepository(ISessionRepository):
 
     async def save(self, session: Session, user_id: uuid.UUID) -> None:
         values = self._to_values(session, user_id)
-        stmt = pg_insert(SessionModel).values(**values)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["session_id"],
-            set_={k: stmt.excluded[k] for k in values if k != "session_id"},
+        result = await self._db.execute(
+            select(SessionModel).where(SessionModel.session_id == session.session_id)
         )
-        await self._db.execute(stmt)
+        existing = result.scalar_one_or_none()
+        if existing is None:
+            self._db.add(SessionModel(**values))
+        else:
+            for k, v in values.items():
+                setattr(existing, k, v)
         await self._db.commit()
 
     async def get_recent(self, user_id: uuid.UUID, limit: int = 3) -> list[Session]:

@@ -2,7 +2,6 @@ import uuid
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import UserDeck, UserProfile
@@ -74,12 +73,7 @@ class ProfileRepository(IProfileRepository):
 
     async def save(self, profile: UserProfile) -> None:
         values = {**self._to_values(profile), "id": profile.id}
-        stmt = pg_insert(ProfileModel).values(**values)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=["id"],
-            set_={k: stmt.excluded[k] for k in values if k != "id"},
-        )
-        await self._session.execute(stmt)
+        await self._session.merge(ProfileModel(**values))
         await self._session.commit()
         logger.debug("db_save", table="profiles", user_id=str(profile.id))
 
