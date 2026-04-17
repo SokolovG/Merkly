@@ -10,9 +10,9 @@ class TestComputeNextReminderAt:
 
     def test_always_returns_future(self):
         """Result is always strictly greater than now_utc."""
-        now = datetime.now(UTC)
         for hour in (0, 3, 6, 9, 12, 15, 18, 21, 23):
             for offset in (-5, 0, 3):
+                now = datetime.now(UTC)
                 result = compute_next_reminder_at(f"{hour:02d}:00", offset)
                 assert result > now, f"Failed for {hour:02d}:00, offset={offset}"
 

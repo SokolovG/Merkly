@@ -1,6 +1,7 @@
 """Tests for AudioService — uses respx to mock httpx without network."""
 
 import os
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -50,36 +51,57 @@ def test_validate_rejects_file_scheme():
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_download_writes_temp_file_and_returns_path():
+@patch("src.infrastructure.audio.subprocess.run")
+async def test_download_writes_temp_file_and_returns_path(mock_run):
     audio_bytes = b"fake-mp3-data"
     respx.get("https://cdn.example.com/episode.mp3").mock(
         return_value=httpx.Response(206, content=audio_bytes)
     )
+
+    # Mock ffmpeg — create the output file so the path exists
+    def fake_ffmpeg(args, **kwargs):
+        out_path = args[-1]
+        with open(out_path, "wb") as f:
+            f.write(b"fake-output")
+
+    mock_run.side_effect = fake_ffmpeg
+
     service = AudioService()
+    path = None
     try:
         path = await service.download("https://cdn.example.com/episode.mp3", duration_min=3)
         assert path.endswith(".mp3")
         assert os.path.exists(path)
-        with open(path, "rb") as f:
-            assert f.read() == audio_bytes
     finally:
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             os.unlink(path)
         await service.aclose()
 
 
 @pytest.mark.asyncio
 @respx.mock
-async def test_download_uses_m4a_suffix_for_m4a_url():
+@patch("src.infrastructure.audio.subprocess.run")
+async def test_download_uses_m4a_suffix_for_m4a_url(mock_run):
+    """Raw input uses .m4a suffix for m4a URLs; output is always .mp3."""
     respx.get("https://cdn.example.com/episode.m4a").mock(
         return_value=httpx.Response(206, content=b"fake-m4a")
     )
+
+    def fake_ffmpeg(args, **kwargs):
+        out_path = args[-1]
+        with open(out_path, "wb") as f:
+            f.write(b"fake-output")
+
+    mock_run.side_effect = fake_ffmpeg
+
     service = AudioService()
+    path = None
     try:
         path = await service.download("https://cdn.example.com/episode.m4a", duration_min=3)
-        assert path.endswith(".m4a")
+        # Output is always .mp3 (raw temp file uses .m4a, but export is mp3)
+        assert path.endswith(".mp3")
     finally:
-        if os.path.exists(path):
+        if path and os.path.exists(path):
             os.unlink(path)
         await service.aclose()
 

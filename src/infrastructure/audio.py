@@ -1,10 +1,10 @@
 import ipaddress
 import os
+import subprocess
 import tempfile
 from urllib.parse import urlparse
 
 import httpx
-from pydub import AudioSegment
 
 from src.infrastructure.exceptions import InfrastructureError
 
@@ -44,11 +44,23 @@ class AudioService:
             raw.write(response.content)
             raw_path = raw.name
         try:
-            audio = AudioSegment.from_file(raw_path)
-            trimmed = audio[: duration_min * 60 * 1000]  # pydub uses milliseconds
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as out:
                 out_path = out.name
-            trimmed.export(out_path, format="mp3")
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-t",
+                    str(duration_min * 60),
+                    "-i",
+                    raw_path,
+                    "-c:a",
+                    "libmp3lame",
+                    out_path,
+                ],
+                check=True,
+                capture_output=True,
+            )
         finally:
             os.unlink(raw_path)
         return out_path
