@@ -4,6 +4,7 @@ from typing import Any
 import structlog
 from aiogram.types import CallbackQuery
 from aiogram_dialog import DialogManager
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities import DEFAULT_VOCAB_CARD_COUNT, Identity, UserProfile
 from src.domain.enums import ActivityType, Platform
@@ -18,8 +19,9 @@ async def save_profile_on_confirm(
     """Button on_click handler for the confirm window. Saves UserProfile and closes dialog."""
     structlog.contextvars.clear_contextvars()
     container = manager.middleware_data["dishka_container"]
-    profile_repo: ProfileRepository = await container.get(ProfileRepository)
-    identity_repo: IdentityRepository = await container.get(IdentityRepository)
+    session: AsyncSession = await container.get(AsyncSession)
+    profile_repo = ProfileRepository(session)
+    identity_repo = IdentityRepository(session)
 
     data = manager.dialog_data
     user = callback.from_user

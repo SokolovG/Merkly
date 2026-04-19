@@ -6,6 +6,7 @@ from aiogram.types import Message
 from aiogram_dialog import Dialog, DialogManager, Window
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram_dialog.widgets.text import Const
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings
 from src.domain.enums import Platform
@@ -31,8 +32,9 @@ async def on_bug_report(
     structlog.contextvars.clear_contextvars()
 
     container = manager.middleware_data["dishka_container"]
-    profile_repo: ProfileRepository = await container.get(ProfileRepository)
-    identity_repo: IdentityRepository = await container.get(IdentityRepository)
+    session: AsyncSession = await container.get(AsyncSession)
+    profile_repo = ProfileRepository(session)
+    identity_repo = IdentityRepository(session)
     settings: Settings = await container.get(Settings)
     bot: Bot = manager.middleware_data["bot"]
 
