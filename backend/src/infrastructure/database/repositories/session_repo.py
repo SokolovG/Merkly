@@ -1,0 +1,86 @@
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from backend.src.domain.entities import Session, VocabCard
+from backend.src.domain.enums import WordType
+from backend.src.domain.ports.session_repo import ISessionRepository
+from backend.src.infrastructure.database.models.session_model import SessionModel
+
+
+class SessionRepository(ISessionRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._db = session
+
+    def _to_domain(self, row: SessionModel) -> Session:
+        cards = [
+            VocabCard(
+                word=d["word"],
+                translation=d["translation"],
+                example_sentence=d["example_sentence"],
+                word_type=WordType(d["word_type"]),
+                article=d.get("article"),
+                backend_id=d.get("backend_id"),
+            )
+            for d in (row.cards_created or [])
+        ]
+        return Session(
+            session_id=row.session_id,
+            user_id=row.user_id,
+            date=row.created_at.strftime("%Y-%m-%d") if row.created_at else "",
+            article_url=row.article_url,
+            article_title=row.article_title,
+            article_text=row.article_text,
+            questions=list(row.questions or []),
+            user_answers=list(row.user_answers or []),
+            feedback=row.feedback,
+            cards_created=cards,
+            duration_seconds=row.duration_seconds,
+        )
+
+    def _to_values(self, session: Session, user_id: uuid.UUID) -> dict:
+        return {
+            "session_id": session.session_id,
+            "user_id": user_id,
+            "article_url": session.article_url,
+            "article_title": session.article_title,
+            "article_text": session.article_text,
+            "questions": list(session.questions),
+            "user_answers": list(session.user_answers),
+            "feedback": session.feedback,
+            "cards_created": [
+                {
+                    "word": c.word,
+                    "translation": c.translation,
+                    "example_sentence": c.example_sentence,
+                    "word_type": str(c.word_type),
+                    "article": c.article,
+                    "backend_id": c.backend_id,
+                }
+                for c in session.cards_created
+            ],
+            "duration_seconds": session.duration_seconds,
+        }
+
+    async def save(self, session: Session, user_id: uuid.UUID) -> None:
+        values = self._to_values(session, user_id)
+        result = await self._db.execute(
+            select(SessionModel).where(SessionModel.session_id == session.session_id)
+        )
+        existing = result.scalar_one_or_none()
+        if existing is None:
+            self._db.add(SessionModel(**values))
+        else:
+            for k, v in values.items():
+                setattr(existing, k, v)
+        await self._db.commit()
+
+    async def get_recent(self, user_id: uuid.UUID, limit: int = 3) -> list[Session]:
+        result = await self._db.execute(
+            select(SessionModel)
+            .where(SessionModel.user_id == user_id)
+            .order_by(SessionModel.created_at.desc())
+            .limit(limit)
+        )
+        return [self._to_domain(row) for row in result.scalars().all()]
