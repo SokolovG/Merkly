@@ -24,7 +24,8 @@ _PLATFORM = "telegram"
 @router.message(Command("listen"))
 async def cmd_listen(message: Message, backend: FromDishka[BackendClient]) -> None:
     structlog.contextvars.clear_contextvars()
-    contact_id = str(message.from_user.id)  # type: ignore[union-attr]
+    assert message.from_user is not None
+    contact_id = str(message.from_user.id)
     structlog.contextvars.bind_contextvars(contact_id=contact_id)
     logger.info("cmd_listen")
 

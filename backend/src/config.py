@@ -16,7 +16,13 @@ class BackendSettings(BaseSettings):
     BACKEND_API_KEY: SecretStr = SecretStr("dev-secret")
 
     # Redis
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    REDIS_PASSWORD: str = ""
+
+    # Storage
+    STORAGE_PROVIDER: Literal["redis", "memory"] = "redis"
 
     # LLM
     LLM_BASE_URL: str = "https://api.openai.com/v1"

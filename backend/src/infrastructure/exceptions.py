@@ -15,3 +15,7 @@ class FetcherError(InfrastructureError):
 
 class LLMError(InfrastructureError):
     """LLM call failed or returned unusable output."""
+
+
+class StorageError(InfrastructureError):
+    """Key-value storage read/write failure."""

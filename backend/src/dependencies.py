@@ -1,6 +1,7 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from dishka import Provider, Scope, make_async_container, provide
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,6 +13,7 @@ from backend.src.application.agent.core import CardBackend, LessonAgent
 from backend.src.application.article_refill_service import ArticleRefillService
 from backend.src.application.listening_refill_service import ListeningRefillService
 from backend.src.application.listening_service import ListeningAgent
+from backend.src.application.ports.storage import Storage
 from backend.src.application.vocab_refill_service import VocabRefillService
 from backend.src.config import BackendSettings
 from backend.src.domain.ports.listening_history_repo import IListeningHistoryRepository
@@ -33,6 +35,9 @@ from backend.src.infrastructure.database.repositories import (
 from backend.src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter
 from backend.src.infrastructure.fetchers.rss import NewsArticleFetcher
 from backend.src.infrastructure.llm.client import LLMClient
+from backend.src.infrastructure.memory_storage import InMemoryStorage
+from backend.src.infrastructure.redis_storage import RedisStorage
+from backend.src.infrastructure.session_store import RedisSessionStore
 from backend.src.infrastructure.whisper.client import WhisperClient
 
 
@@ -185,6 +190,32 @@ class AppProvider(Provider):
         repo: IListeningPoolRepository,
     ) -> ListeningRefillService:
         return ListeningRefillService(service=service, repo=repo)
+
+    @provide(scope=Scope.APP)
+    async def get_redis_client(self, settings: BackendSettings) -> AsyncIterator[Redis]:
+        client = Redis(
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            db=settings.REDIS_DB,
+            password=settings.REDIS_PASSWORD or None,
+            decode_responses=True,
+            max_connections=50,
+            retry_on_timeout=True,
+        )
+        try:
+            yield client
+        finally:
+            await client.aclose()
+
+    @provide(scope=Scope.APP, provides=Storage)
+    def get_storage(self, redis_client: Redis, settings: BackendSettings) -> Storage:
+        if settings.STORAGE_PROVIDER == "memory":
+            return InMemoryStorage()
+        return RedisStorage(redis_client)
+
+    @provide(scope=Scope.REQUEST)
+    def session_store(self, storage: Storage) -> RedisSessionStore:
+        return RedisSessionStore(storage)
 
 
 def create_container():

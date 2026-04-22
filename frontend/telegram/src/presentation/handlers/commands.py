@@ -31,7 +31,8 @@ _CB_WRITING = "writing"
 
 
 def _contact_id(message: Message) -> str:
-    return str(message.from_user.id)  # type: ignore[union-attr]
+    assert message.from_user is not None
+    return str(message.from_user.id)
 
 
 def _cards_keyboard(cards: list[CardDTO]) -> InlineKeyboardMarkup:
@@ -275,12 +276,14 @@ async def handle_writing_start(callback: CallbackQuery, backend: FromDishka[Back
         return
 
     await callback.answer()
+    if not isinstance(callback.message, Message):
+        return
     mode_label = {
         "sentences": "✍️ Sentences",
         "grammar": "📝 Grammar focus",
         "article": "📰 Essay",
     }.get(mode, "✍️ Writing exercise")
-    await callback.message.answer(  # type: ignore[union-attr]
+    await callback.message.answer(
         f"<b>{mode_label}:</b>\n\nWrite your exercise and send it as one message.",
         parse_mode="HTML",
     )
@@ -293,14 +296,16 @@ async def handle_writing_start(callback: CallbackQuery, backend: FromDishka[Back
 
 @router.callback_query(F.data.startswith(f"{_CB_DEL_CARD}:"))
 async def handle_delete_card(callback: CallbackQuery) -> None:
+    if not isinstance(callback.message, Message):
+        return
     action = (callback.data or "").split(":", 1)[1]
     if action == "all":
-        await callback.message.edit_reply_markup(reply_markup=None)  # type: ignore[union-attr]
+        await callback.message.edit_reply_markup(reply_markup=None)
         await callback.answer("🗑 Removed from view")
     else:
         await callback.answer(f"🗑 {action} removed from view")
         # Remove the tapped button from the keyboard
-        if callback.message and callback.message.reply_markup:
+        if callback.message.reply_markup:
             old_kb = callback.message.reply_markup.inline_keyboard
             new_rows = [
                 [btn for btn in row if not btn.callback_data == callback.data] for row in old_kb

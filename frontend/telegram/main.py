@@ -54,7 +54,7 @@ def setup_bot(settings: TgSettings) -> tuple[Bot, Dispatcher]:
 
 
 async def main() -> None:
-    settings = TgSettings()
+    settings = TgSettings()  # type: ignore
     configure_structlog(settings.DEBUG)
 
     bot, dp = setup_bot(settings)

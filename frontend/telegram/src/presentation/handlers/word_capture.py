@@ -63,7 +63,8 @@ async def cmd_capture_word(
     backend: FromDishka[BackendClient],
 ) -> None:
     structlog.contextvars.clear_contextvars()
-    contact_id = str(message.from_user.id)  # type: ignore[union-attr]
+    assert message.from_user is not None
+    contact_id = str(message.from_user.id)
     structlog.contextvars.bind_contextvars(contact_id=contact_id)
 
     raw = (message.text or "")[1:]
@@ -96,7 +97,8 @@ async def cmd_capture_word(
 @router.callback_query(F.data == _CB_LOOKS_GOOD)
 async def handle_word_ok(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
-    await callback.message.edit_reply_markup(reply_markup=None)  # type: ignore[union-attr]
+    if isinstance(callback.message, Message):
+        await callback.message.edit_reply_markup(reply_markup=None)
     await callback.answer("✅ Saved!")
 
 
@@ -104,11 +106,12 @@ async def handle_word_ok(callback: CallbackQuery, state: FSMContext) -> None:
 async def handle_wrong_meaning(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(RegenState.waiting_for_context)
     await callback.answer()
-    await callback.message.answer(  # type: ignore[union-attr]
-        "Send context for the word (e.g. <i>slang</i>, <i>food</i>, a phrase).\n"
-        "I'll regenerate the card with the correct meaning.",
-        parse_mode="HTML",
-    )
+    if isinstance(callback.message, Message):
+        await callback.message.answer(
+            "Send context for the word (e.g. <i>slang</i>, <i>food</i>, a phrase).\n"
+            "I'll regenerate the card with the correct meaning.",
+            parse_mode="HTML",
+        )
 
 
 @router.message(RegenState.waiting_for_context, F.text)
@@ -120,7 +123,8 @@ async def handle_regen_context(
     data = await state.get_data()
     word = data.get("regen_word", "")
     context = message.text or ""
-    contact_id = str(message.from_user.id)  # type: ignore[union-attr]
+    assert message.from_user is not None
+    contact_id = str(message.from_user.id)
 
     await state.clear()
 

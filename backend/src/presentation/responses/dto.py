@@ -1,5 +1,5 @@
 from collections.abc import Collection
-from typing import Any
+from typing import Any, cast
 
 from litestar.dto import DTOConfig, MsgspecDTO
 
@@ -11,8 +11,8 @@ class SuccessResponseDTO(MsgspecDTO[SuccessResponse]):
 
     def data_to_encodable_type(self, data: SuccessResponse | Collection[Any]) -> dict[str, Any]:
         if isinstance(data, Collection) and not isinstance(data, str | bytes):
-            return {"items": [self._encode(item) for item in data]}
-        return self._encode(data)
+            return {"items": [self._encode(cast(SuccessResponse, item)) for item in data]}
+        return self._encode(cast(SuccessResponse, data))
 
     def _encode(self, data: SuccessResponse) -> dict[str, Any]:
         import msgspec
