@@ -39,5 +39,6 @@ class IdentityController(Controller):
                 user_id=str(identity.user_id),
                 platform=platform,
                 platform_user_id=contact_id,
-            )
+            ),
+            message="Identity resolved",
         )

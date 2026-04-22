@@ -43,7 +43,7 @@ class ProfileController(Controller):
         if profile is None:
             raise NotFoundException(detail=f"Profile not found: {user_id}") from None
 
-        return SuccessResponse(data=profile_to_response(profile))
+        return SuccessResponse(data=profile_to_response(profile), message="Profile fetched")
 
     @inject
     @patch("/{user_id:str}")
@@ -65,4 +65,4 @@ class ProfileController(Controller):
 
         updated = _apply_update(profile, data)
         await repo.save(updated)
-        return SuccessResponse(data=profile_to_response(updated))
+        return SuccessResponse(data=profile_to_response(updated), message="Profile updated")

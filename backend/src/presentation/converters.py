@@ -5,7 +5,7 @@ All converters are module-level constants — adaptix compiles them once at impo
 values are already assignment-compatible with `str` fields in msgspec.Struct.
 """
 
-from adaptix.conversion import allow_unlinked_optional, get_converter
+from adaptix.conversion import get_converter
 
 from backend.src.domain.entities import PooledVocabCard, UserProfile, VocabCard
 from backend.src.presentation.dto.profile.responses import ProfileResponse
@@ -16,22 +16,22 @@ from backend.src.presentation.dto.shared.responses import CardDTO
 _vocab_card_to_dto = get_converter(VocabCard, CardDTO)
 
 
-# PooledVocabCard → CardDTO
-# Extra source fields `id`, `target_lang` are ignored.
-# `grammar_note` exists in CardDTO (optional) but not in PooledVocabCard — must be allowed.
-_pooled_card_to_dto = get_converter(
-    PooledVocabCard,
-    CardDTO,
-    recipe=[allow_unlinked_optional(CardDTO)],
-)
-
-
 def vocab_card_to_dto(card: VocabCard) -> CardDTO:
     return _vocab_card_to_dto(card)
 
 
 def pooled_card_to_dto(card: PooledVocabCard) -> CardDTO:
-    return _pooled_card_to_dto(card)
+    # Manual conversion: PooledVocabCard has no grammar_note (not in DB schema),
+    # so we can't use adaptix here — adaptix 3.0b12 rejects allow_unlinked_optional
+    # when the field name matches no source field even with the recipe applied.
+    return CardDTO(
+        word=card.word,
+        translation=card.translation,
+        example_sentence=card.example_sentence,
+        word_type=str(card.word_type),
+        article=card.article,
+        grammar_note=None,
+    )
 
 
 def profile_to_response(profile: UserProfile) -> ProfileResponse:

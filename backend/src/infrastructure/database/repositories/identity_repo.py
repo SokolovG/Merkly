@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -8,6 +9,7 @@ from backend.src.domain.entities import Identity
 from backend.src.domain.enums import Platform
 from backend.src.domain.ports.identity_repo import IIdentityRepository
 from backend.src.infrastructure.database.models.identity_model import IdentityModel
+from backend.src.infrastructure.database.models.profile_model import ProfileModel
 
 logger = structlog.get_logger(__name__)
 
@@ -64,3 +66,29 @@ class IdentityRepository(IIdentityRepository):
         )
         row = result.scalar_one_or_none()
         return self._to_domain(row) if row else None
+
+    async def get_due_for_platform(
+        self, platform: Platform
+    ) -> list[tuple[uuid.UUID, str, str, str]]:
+        """Return (user_id, platform_user_id, target_lang, reminder_time) for users
+        whose next_reminder_at has passed on the given platform."""
+        now = datetime.now(UTC)
+        result = await self._session.execute(
+            select(
+                IdentityModel.user_id,
+                IdentityModel.platform_user_id,
+                ProfileModel.target_lang,
+                ProfileModel.reminder_time,
+            )
+            .join(ProfileModel, ProfileModel.id == IdentityModel.user_id)
+            .where(
+                IdentityModel.platform == str(platform),
+                ProfileModel.reminder_enabled.is_(True),
+                ProfileModel.next_reminder_at.is_not(None),
+                ProfileModel.next_reminder_at <= now,
+            )
+        )
+        return [
+            (row.user_id, row.platform_user_id, row.target_lang, row.reminder_time)
+            for row in result.all()
+        ]

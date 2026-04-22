@@ -1,12 +1,13 @@
 services:
-  db:
+  postgres:
     image: postgres:17
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
+    restart: unless-stopped
     environment:
-      - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_USER=${DB_USER}
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     healthcheck:
@@ -14,38 +15,67 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   whisper:
     image: fedirz/faster-whisper-server:latest-cpu
     restart: unless-stopped
     environment:
-      - WHISPER__MODEL=base
+      WHISPER__MODEL: base
     ports:
       - "8001:8000"
     volumes:
-      - whisper-models:/root/.cache/huggingface
-    # healthcheck:
-    #   test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
-    #   interval: 10s
-    #   timeout: 5s
-    #   retries: 12
-    #   start_period: 60s
+      - whisper_models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
 
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     env_file: .env
+    environment:
+      DB_HOST: postgres
+      REDIS_HOST: redis
+      WHISPER_BASE_URL: http://whisper:8000
+    ports:
+      - "8080:8080"
     depends_on:
-      db:
-        condition: service_started
-      whisper:
-        condition: service_started
-    volumes:
-      - ./src:/app/src
-      - ./alembic/versions:/app/alembic/versions
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     extra_hosts:
-      # Allows bot to reach AnkiConnect running on host machine
+      # Allows backend to reach AnkiConnect running on the host machine
       - "host.docker.internal:host-gateway"
+
+  telegram-bot:
+    build:
+      context: frontend/telegram
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      backend:
+        condition: service_started
 
 volumes:
   postgres_data:
-  whisper-models:
+  whisper_models:

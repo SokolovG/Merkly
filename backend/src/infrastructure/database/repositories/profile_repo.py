@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.src.domain.entities import UserDeck, UserProfile
@@ -99,3 +100,10 @@ class ProfileRepository(IProfileRepository):
             )
         )
         return [self._to_domain(row) for row in result.scalars().all()]
+
+    async def update_next_reminder_at(self, user_id: uuid.UUID, dt: datetime) -> None:
+        """Update only next_reminder_at — avoids a full profile upsert."""
+        await self._session.execute(
+            update(ProfileModel).where(ProfileModel.id == user_id).values(next_reminder_at=dt)
+        )
+        await self._session.commit()

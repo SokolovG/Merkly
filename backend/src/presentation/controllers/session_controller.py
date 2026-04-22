@@ -13,7 +13,10 @@ from litestar.exceptions import ClientException, NotFoundException
 from litestar.params import Parameter
 
 from backend.src.application.agent.core import LessonAgent
+from backend.src.application.listening_service import ListeningAgent
 from backend.src.domain.enums import ActivityType, Platform
+from backend.src.domain.ports.listening_pool_repo import IListeningPoolRepository
+from backend.src.domain.ports.session_history_repo import ISessionHistoryRepository
 from backend.src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
 from backend.src.infrastructure.database.repositories.identity_repo import IdentityRepository
 from backend.src.infrastructure.database.repositories.profile_repo import ProfileRepository
@@ -121,14 +124,92 @@ class SessionController(Controller):
                 title=title,
                 content=text,
                 questions=questions,
-            )
+            ),
+            message="Reading session started",
         )
 
     @inject
     @post("/listening/start")
-    async def start_listening_session(self, data: StartListeningSessionRequest) -> SuccessResponse:
-        """Listening session start — implemented in 19-07."""
-        raise NotImplementedError
+    async def start_listening_session(
+        self,
+        data: StartListeningSessionRequest,
+        identity_repo: FromDishka[IdentityRepository],
+        profile_repo: FromDishka[ProfileRepository],
+        listening_pool: FromDishka[IListeningPoolRepository],
+        session_history: FromDishka[ISessionHistoryRepository],
+        listening_agent: FromDishka[ListeningAgent],
+        store: FromDishka[RedisSessionStore],
+    ) -> SuccessResponse:
+        """Resolve contact → profile → fetch episode (pool or live) →
+        create Redis session with state=questions → return title+questions+audio_url."""
+        try:
+            platform_enum = Platform(data.platform)
+        except ValueError:
+            raise NotFoundException(detail=f"Unknown platform: {data.platform!r}") from None
+
+        identity = await identity_repo.get_by_platform(platform_enum, data.contact_id)
+        if identity is None:
+            raise NotFoundException(
+                detail=f"No identity for {data.platform}:{data.contact_id}"
+            ) from None
+
+        profile = await profile_repo.get_by_id(identity.user_id)
+        if profile is None:
+            raise NotFoundException(
+                detail=f"Profile not found for user_id={identity.user_id}"
+            ) from None
+
+        # Try pool first; fall back to live Whisper transcription
+        pool_lesson = await listening_pool.get_oldest(profile.id, str(profile.target_lang))
+        if pool_lesson is not None:
+            await listening_pool.mark_served(pool_lesson.id)
+            title = pool_lesson.title
+            episode_url = pool_lesson.episode_url
+            questions = list(pool_lesson.questions)
+            content = pool_lesson.transcript[:2000]
+        else:
+            lesson = await listening_agent.prepare_lesson(profile)
+            title = lesson.title
+            episode_url = lesson.episode_url
+            questions = lesson.questions
+            content = lesson.transcript[:2000]
+
+        await session_history.record(profile.id, episode_url, ActivityType.LISTENING)
+
+        session_id = str(uuid.uuid4())
+        session: dict = {
+            "session_id": session_id,
+            "user_id": str(identity.user_id),
+            "session_type": "listening",
+            "state": "questions",
+            "target_lang": str(profile.target_lang),
+            "title": title,
+            "url": episode_url,
+            "text": content,
+            "questions": questions,
+            "user_answers": [],
+            "feedback": None,
+            "writing_text": None,
+            "writing_feedback": None,
+            "level": profile.level,
+            "native_lang": str(profile.native_lang),
+            "question_count": len(questions),
+            "audio_url": episode_url,
+            "created_at": datetime.now(UTC).isoformat(),
+        }
+        await store.save(session, user_id=str(identity.user_id))
+
+        return SuccessResponse(
+            data=StartSessionResponse(
+                session_id=session_id,
+                session_type="listening",
+                title=title,
+                content=content,
+                questions=questions,
+                audio_url=episode_url,
+            ),
+            message="Listening session started",
+        )
 
     @inject
     @get("/active")
@@ -140,7 +221,9 @@ class SessionController(Controller):
         contact_id: str = Parameter(query="contact_id"),
     ) -> SuccessResponse:
         """Look up Redis for any active session for this contact."""
-        _empty = SuccessResponse(data=ActiveSessionResponse(session_id=None, state=None))
+        _empty = SuccessResponse(
+            data=ActiveSessionResponse(session_id=None, state=None), message="No active session"
+        )
 
         try:
             platform_enum = Platform(platform)
@@ -159,7 +242,10 @@ class SessionController(Controller):
         if session is None:
             return _empty
 
-        return SuccessResponse(data=ActiveSessionResponse(session_id=sid, state=session["state"]))
+        return SuccessResponse(
+            data=ActiveSessionResponse(session_id=sid, state=session["state"]),
+            message="Active session found",
+        )
 
     @inject
     @post("/{session_id:str}/answer")
@@ -183,7 +269,8 @@ class SessionController(Controller):
         if answered < total:
             await store.save(session, user_id=session["user_id"])
             return SuccessResponse(
-                data=AnswerResponse(feedback="", writing_available=False, cards=[])
+                data=AnswerResponse(feedback="", writing_available=False, cards=[]),
+                message="Answer recorded",
             )
 
         feedback, _ = await agent.review_answers(
@@ -209,7 +296,8 @@ class SessionController(Controller):
         await store.save(session, user_id=session["user_id"])
 
         return SuccessResponse(
-            data=AnswerResponse(feedback=feedback, writing_available=writing_available, cards=[])
+            data=AnswerResponse(feedback=feedback, writing_available=writing_available, cards=[]),
+            message="Answers reviewed",
         )
 
     @inject
@@ -254,5 +342,6 @@ class SessionController(Controller):
             data=WritingResponse(
                 feedback=feedback,
                 cards=[vocab_card_to_dto(c) for c in cards],
-            )
+            ),
+            message="Writing reviewed",
         )

@@ -57,7 +57,8 @@ class VocabController(Controller):
                 data=VocabResponse(
                     topic="Vocabulary",
                     cards=[pooled_card_to_dto(c) for c in pool_cards],
-                )
+                ),
+                message="Vocab cards served from pool",
             )
 
         # Pool empty — generate live
@@ -74,7 +75,8 @@ class VocabController(Controller):
             data=VocabResponse(
                 topic=actual_topic,
                 cards=[vocab_card_to_dto(c) for c in vocab_cards],
-            )
+            ),
+            message="Vocab cards generated",
         )
 
     @inject
@@ -107,7 +109,10 @@ class VocabController(Controller):
         cards = [
             CardDTO(word=w, translation="", example_sentence="", word_type="noun") for w in words
         ]
-        return SuccessResponse(data=RepeatVocabResponse(cards=cards, total_seen=len(total_result)))
+        return SuccessResponse(
+            data=RepeatVocabResponse(cards=cards, total_seen=len(total_result)),
+            message="Repeat cards fetched",
+        )
 
     @inject
     @post("/word")
@@ -137,7 +142,8 @@ class VocabController(Controller):
             data=CaptureWordResponse(
                 card=vocab_card_to_dto(card),
                 pool_card_id=card.backend_id or str(uuid.uuid4()),
-            )
+            ),
+            message="Word captured",
         )
 
     @inject
@@ -168,5 +174,6 @@ class VocabController(Controller):
             data=CaptureWordResponse(
                 card=vocab_card_to_dto(card),
                 pool_card_id=card.backend_id or str(uuid.uuid4()),
-            )
+            ),
+            message="Word regenerated",
         )
