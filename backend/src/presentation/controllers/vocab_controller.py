@@ -1,18 +1,22 @@
-"""Vocab controller — card generation, word capture, repeat."""
-
-import uuid
-
 from dishka.integrations.litestar import FromDishka, inject
 from litestar import Controller, get, post
 from litestar.exceptions import NotFoundException
 from litestar.params import Parameter
 
-from backend.src.application.agent.core import LessonAgent
-from backend.src.infrastructure.database.repositories.profile_repo import ProfileRepository
+from backend.src.application.use_cases.resolve_user import UserResolverUseCase
+from backend.src.application.use_cases.vocab_use_case import (
+    CaptureWordUseCase,
+    GenerateVocabUseCase,
+)
+from backend.src.domain.enums import Platform
 from backend.src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from backend.src.presentation.converters import pooled_card_to_dto, vocab_card_to_dto
 from backend.src.presentation.dto.shared.responses import CardDTO
-from backend.src.presentation.dto.vocab.requests import CaptureWordRequest, RegenerateWordRequest
+from backend.src.presentation.dto.vocab.requests import (
+    CaptureWordRequest,
+    GenerateVocabRequest,
+    RegenerateWordRequest,
+)
 from backend.src.presentation.dto.vocab.responses import (
     CaptureWordResponse,
     RepeatVocabResponse,
@@ -25,86 +29,51 @@ class VocabController(Controller):
     path = "/vocab"
 
     @inject
-    @get("")
+    @post("/generate")
     async def generate_vocab(
         self,
-        user_id: str = Parameter(query="user_id"),
-        count: int | None = Parameter(query="count", default=None),
-        topic: str | None = Parameter(query="topic", default=None),
-        *,
-        profile_repo: FromDishka[ProfileRepository],
-        vocab_repo: FromDishka[VocabPoolRepository],
-        agent: FromDishka[LessonAgent],
+        data: GenerateVocabRequest,
+        resolver: FromDishka[UserResolverUseCase],
+        generate_uc: FromDishka[GenerateVocabUseCase],
     ) -> SuccessResponse:
         """Serve vocab cards from pool (or live LLM if pool empty)."""
-        try:
-            uid = uuid.UUID(user_id)
-        except ValueError:
-            raise NotFoundException(detail=f"Invalid user_id: {user_id!r}") from None
+        ctx = await resolver.resolve(data.platform, data.contact_id)
+        result = await generate_uc.execute(ctx.profile, data.count, data.force_topic)
 
-        profile = await profile_repo.get_by_id(uid)
-        if profile is None:
-            raise NotFoundException(detail=f"Profile not found: {user_id}") from None
-
-        card_count = count or profile.vocab_card_count
-        pool_cards = await vocab_repo.get_pool_cards(
-            profile.id, str(profile.target_lang), card_count
-        )
-
-        if pool_cards:
-            await vocab_repo.mark_shown(profile.id, [c.id for c in pool_cards])
-            return SuccessResponse(
-                data=VocabResponse(
-                    topic="Vocabulary",
-                    cards=[pooled_card_to_dto(c) for c in pool_cards],
-                ),
-                message="Vocab cards served from pool",
-            )
-
-        # Pool empty — generate live
-        actual_topic, vocab_cards = await agent.topic_vocab_lesson(
-            level=profile.level,
-            goal=str(profile.goal),
-            native_lang=str(profile.native_lang),
-            target_lang=str(profile.target_lang),
-            recent_topics=[],
-            count=card_count,
-            force_topic=topic,
+        cards = (
+            [pooled_card_to_dto(c) for c in result.cards]  # type: ignore[arg-type]
+            if result.from_pool
+            else [vocab_card_to_dto(c) for c in result.cards]  # type: ignore[arg-type]
         )
         return SuccessResponse(
-            data=VocabResponse(
-                topic=actual_topic,
-                cards=[vocab_card_to_dto(c) for c in vocab_cards],
-            ),
-            message="Vocab cards generated",
+            data=VocabResponse(topic=result.topic, cards=cards),
+            message="Vocab cards served from pool" if result.from_pool else "Vocab cards generated",
         )
 
     @inject
     @get("/repeat")
     async def repeat_vocab(
         self,
-        user_id: str = Parameter(query="user_id"),
-        count: int | None = Parameter(query="count", default=None),
-        *,
-        profile_repo: FromDishka[ProfileRepository],
+        resolver: FromDishka[UserResolverUseCase],
         vocab_repo: FromDishka[VocabPoolRepository],
+        platform: str = Parameter(query="platform"),
+        contact_id: str = Parameter(query="contact_id"),
+        count: int | None = Parameter(query="count", default=None),
     ) -> SuccessResponse:
         """Return oldest-first cards from vocab_history. No LLM call."""
         try:
-            uid = uuid.UUID(user_id)
+            platform_enum = Platform(platform)
         except ValueError:
-            raise NotFoundException(detail=f"Invalid user_id: {user_id!r}") from None
+            raise NotFoundException(detail=f"Unknown platform: {platform!r}") from None
 
-        profile = await profile_repo.get_by_id(uid)
-        if profile is None:
-            raise NotFoundException(detail=f"Profile not found: {user_id}") from None
+        ctx = await resolver.resolve(platform_enum, contact_id)
+        card_count = count or ctx.profile.vocab_card_count
 
-        card_count = count or profile.vocab_card_count
         words = await vocab_repo.get_history_words(
-            profile.id, str(profile.target_lang), limit=card_count, oldest_first=True
+            ctx.profile.id, str(ctx.profile.target_lang), limit=card_count, oldest_first=True
         )
         total_result = await vocab_repo.get_history_words(
-            profile.id, str(profile.target_lang), limit=10_000, oldest_first=False
+            ctx.profile.id, str(ctx.profile.target_lang), limit=10_000, oldest_first=False
         )
         cards = [
             CardDTO(word=w, translation="", example_sentence="", word_type="noun") for w in words
@@ -119,31 +88,34 @@ class VocabController(Controller):
     async def capture_word(
         self,
         data: CaptureWordRequest,
-        profile_repo: FromDishka[ProfileRepository],
-        agent: FromDishka[LessonAgent],
+        resolver: FromDishka[UserResolverUseCase],
+        capture_uc: FromDishka[CaptureWordUseCase],
     ) -> SuccessResponse:
-        """Run +word capture flow: LLM generates card → save to Anki/Mochi → return card."""
-        try:
-            uid = uuid.UUID(data.user_id)
-        except ValueError:
-            raise NotFoundException(detail=f"Invalid user_id: {data.user_id!r}") from None
+        """Duplicate check → LLM card generation → return card.
 
-        profile = await profile_repo.get_by_id(uid)
-        if profile is None:
-            raise NotFoundException(detail=f"Profile not found: {data.user_id}") from None
+        already_exists=True: word is in vocab history, no LLM call was made.
+        Status is always 200; callers discriminate via the already_exists field.
+        """
+        ctx = await resolver.resolve(data.platform, data.contact_id)
+        result = await capture_uc.execute(ctx.profile, data.word, data.context)
 
-        card = await agent.capture_word(
-            word=data.word,
-            target_lang=str(profile.target_lang),
-            native_lang=str(profile.native_lang),
-            context=data.context,
-        )
+        if result.already_exists:
+            # No card was generated — return a minimal placeholder.
+            # The TG bot shows word_already_exists() message and ignores card data.
+            card_dto = CardDTO(
+                word=data.word, translation="", example_sentence="", word_type="noun"
+            )
+        else:
+            assert result.card is not None
+            card_dto = vocab_card_to_dto(result.card)
+
         return SuccessResponse(
             data=CaptureWordResponse(
-                card=vocab_card_to_dto(card),
-                pool_card_id=card.backend_id or str(uuid.uuid4()),
+                card=card_dto,
+                pool_card_id=result.pool_card_id,
+                already_exists=result.already_exists,
             ),
-            message="Word captured",
+            message="Word already in history" if result.already_exists else "Word captured",
         )
 
     @inject
@@ -151,29 +123,18 @@ class VocabController(Controller):
     async def regenerate_word(
         self,
         data: RegenerateWordRequest,
-        profile_repo: FromDishka[ProfileRepository],
-        agent: FromDishka[LessonAgent],
+        resolver: FromDishka[UserResolverUseCase],
+        capture_uc: FromDishka[CaptureWordUseCase],
     ) -> SuccessResponse:
-        """Re-run word capture with explicit context → return updated card."""
-        try:
-            uid = uuid.UUID(data.user_id)
-        except ValueError:
-            raise NotFoundException(detail=f"Invalid user_id: {data.user_id!r}") from None
-
-        profile = await profile_repo.get_by_id(uid)
-        if profile is None:
-            raise NotFoundException(detail=f"Profile not found: {data.user_id}") from None
-
-        card = await agent.capture_word(
-            word=data.word,
-            target_lang=str(profile.target_lang),
-            native_lang=str(profile.native_lang),
-            context=data.context,
-        )
+        """Re-run word capture with explicit context, bypassing duplicate check."""
+        ctx = await resolver.resolve(data.platform, data.contact_id)
+        result = await capture_uc.execute_regen(ctx.profile, data.word, data.context)
+        assert result.card is not None
         return SuccessResponse(
             data=CaptureWordResponse(
-                card=vocab_card_to_dto(card),
-                pool_card_id=card.backend_id or str(uuid.uuid4()),
+                card=vocab_card_to_dto(result.card),
+                pool_card_id=result.pool_card_id,
+                already_exists=False,
             ),
             message="Word regenerated",
         )

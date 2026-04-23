@@ -15,13 +15,11 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from dishka.integrations.aiogram import FromDishka
 
 from src.infrastructure.backend_client import BackendClient, CaptureWordResponse
+from src.presentation import messages
+from src.presentation.handlers.common import PLATFORM, CallbackAction, contact_id as get_contact_id
 
 router = Router()
 logger = structlog.get_logger(__name__)
-
-_PLATFORM = "telegram"
-_CB_LOOKS_GOOD = "word_ok"
-_CB_WRONG_MEANING = "word_regen"
 
 
 class RegenState(StatesGroup):
@@ -37,8 +35,10 @@ def _word_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="✅ Looks good", callback_data=_CB_LOOKS_GOOD),
-                InlineKeyboardButton(text="🔄 Wrong meaning?", callback_data=_CB_WRONG_MEANING),
+                InlineKeyboardButton(text="✅ Looks good", callback_data=CallbackAction.WORD_OK),
+                InlineKeyboardButton(
+                    text="🔄 Wrong meaning?", callback_data=CallbackAction.WORD_REGEN
+                ),
             ]
         ]
     )
@@ -63,9 +63,8 @@ async def cmd_capture_word(
     backend: FromDishka[BackendClient],
 ) -> None:
     structlog.contextvars.clear_contextvars()
-    assert message.from_user is not None
-    contact_id = str(message.from_user.id)
-    structlog.contextvars.bind_contextvars(contact_id=contact_id)
+    cid = get_contact_id(message)
+    structlog.contextvars.bind_contextvars(contact_id=cid)
 
     raw = (message.text or "")[1:]
     if "/" in raw:
@@ -82,10 +81,27 @@ async def cmd_capture_word(
 
     logger.info("cmd_capture_word", word=word, has_context=context is not None)
 
+    # T31: send status message immediately; delete it once response is ready
+    status_msg = await message.answer("🔍 Looking up…")
+
     try:
-        result = await backend.capture_word(_PLATFORM, contact_id, word, context)
+        result = await backend.capture_word(PLATFORM, cid, word, context)
     except Exception as e:
         await message.answer(f"❌ Couldn't capture word: {e}")
+        try:
+            await status_msg.delete()
+        except Exception:
+            pass
+        return
+
+    try:
+        await status_msg.delete()
+    except Exception:
+        pass
+
+    # T30: duplicate — show notice, skip card display and FSM state
+    if result.already_exists:
+        await message.answer(messages.word_already_exists(word), parse_mode="HTML")
         return
 
     # Store word in FSMContext for potential regen (word string only, not full card)
@@ -94,7 +110,7 @@ async def cmd_capture_word(
     await message.answer(_format_card(result), parse_mode="HTML", reply_markup=_word_keyboard())
 
 
-@router.callback_query(F.data == _CB_LOOKS_GOOD)
+@router.callback_query(F.data == CallbackAction.WORD_OK)
 async def handle_word_ok(callback: CallbackQuery, state: FSMContext) -> None:
     await state.clear()
     if isinstance(callback.message, Message):
@@ -102,7 +118,7 @@ async def handle_word_ok(callback: CallbackQuery, state: FSMContext) -> None:
     await callback.answer("✅ Saved!")
 
 
-@router.callback_query(F.data == _CB_WRONG_MEANING)
+@router.callback_query(F.data == CallbackAction.WORD_REGEN)
 async def handle_wrong_meaning(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(RegenState.waiting_for_context)
     await callback.answer()
@@ -123,8 +139,7 @@ async def handle_regen_context(
     data = await state.get_data()
     word = data.get("regen_word", "")
     context = message.text or ""
-    assert message.from_user is not None
-    contact_id = str(message.from_user.id)
+    cid = get_contact_id(message)
 
     await state.clear()
 
@@ -134,7 +149,7 @@ async def handle_regen_context(
 
     logger.info("cmd_regen_word", word=word)
     try:
-        result = await backend.regenerate_word(_PLATFORM, contact_id, word, context)
+        result = await backend.regenerate_word(PLATFORM, cid, word, context)
     except Exception as e:
         await message.answer(f"❌ Couldn't regenerate card: {e}")
         return

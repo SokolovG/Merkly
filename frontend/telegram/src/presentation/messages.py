@@ -11,7 +11,8 @@ def help_text(count: int = 8) -> str:
     return (
         "🤖 <b>Language Tutor Bot</b>\n\n"
         "<b>Commands:</b>\n"
-        "/session — Reading lesson\n"
+        "/session — Auto-start lesson (based on your strategy)\n"
+        "/lesson — Pick lesson type manually\n"
         "/listen — Listening lesson\n"
         f"/vocab — Vocabulary cards (default: {count})\n"
         "/repeat — Review past words\n"
@@ -84,3 +85,11 @@ def card_saved(word: str, deck_name: str) -> str:
 
 def card_saved_no_deck(word: str) -> str:
     return f"📥 Saved: <b>{word}</b>"
+
+
+def word_already_exists(word: str) -> str:
+    return f"✅ <b>{word}</b> is already in your vocabulary history."
+
+
+def lesson_picker() -> str:
+    return "Choose a lesson type:"

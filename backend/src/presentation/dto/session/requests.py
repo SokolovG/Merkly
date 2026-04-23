@@ -1,17 +1,26 @@
 import msgspec
 
+from backend.src.domain.enums import Platform
+
+
+class StartSessionRequest(msgspec.Struct):
+    """POST /sessions/start — auto-picks activity from profile strategy."""
+
+    platform: Platform
+    contact_id: str
+
 
 class StartReadingSessionRequest(msgspec.Struct):
     """POST /sessions/reading/start"""
 
-    platform: str  # "telegram", "whatsapp", "web"
-    contact_id: str  # platform-specific user ID (Telegram int as str)
+    platform: Platform
+    contact_id: str
 
 
 class StartListeningSessionRequest(msgspec.Struct):
     """POST /sessions/listening/start"""
 
-    platform: str
+    platform: Platform
     contact_id: str
 
 

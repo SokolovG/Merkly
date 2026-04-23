@@ -17,38 +17,82 @@ from aiogram.types import (
 )
 from dishka.integrations.aiogram import FromDishka
 
-from src.infrastructure.backend_client import BackendClient, CardDTO
+from src.infrastructure.backend_client import BackendClient, CardDTO, StartSessionResponse
 from src.presentation import messages
+from src.presentation.handlers.common import PLATFORM, CallbackAction, contact_id
 
 router = Router()
 catch_all_router = Router()
 
 logger = structlog.get_logger(__name__)
 
-_PLATFORM = "telegram"
-_CB_DEL_CARD = "delcard"
-_CB_WRITING = "writing"
 
-
-def _contact_id(message: Message) -> str:
-    assert message.from_user is not None
-    return str(message.from_user.id)
+def _lesson_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📖 Reading",
+                    callback_data=f"{CallbackAction.LESSON}:reading",
+                ),
+                InlineKeyboardButton(
+                    text="🎧 Listening",
+                    callback_data=f"{CallbackAction.LESSON}:listening",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🃏 Vocab",
+                    callback_data=f"{CallbackAction.LESSON}:vocab",
+                ),
+            ],
+        ]
+    )
 
 
 def _cards_keyboard(cards: list[CardDTO]) -> InlineKeyboardMarkup:
     btns = [
         InlineKeyboardButton(
             text=f"🗑 {card.word}",
-            callback_data=f"{_CB_DEL_CARD}:{card.word[:20]}",
+            callback_data=f"{CallbackAction.DELETE_CARD}:{card.word[:20]}",
         )
         for card in cards
     ]
     rows = [btns[i : i + 2] for i in range(0, len(btns), 2)]
     if len(cards) > 1:
         rows.append(
-            [InlineKeyboardButton(text="🗑 Delete all", callback_data=f"{_CB_DEL_CARD}:all")]
+            [
+                InlineKeyboardButton(
+                    text="🗑 Delete all",
+                    callback_data=f"{CallbackAction.DELETE_CARD}:all",
+                )
+            ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+async def _send_session_result(target: Message, result: StartSessionResponse) -> None:
+    """Format and send a session start result (reading or listening)."""
+    if result.session_type == "reading":
+        header = (
+            f"📰 <b>{escape(result.title)}</b>\n\n"
+            f"{escape(result.content[:1500])}\n\n---\nAnswer these questions:\n\n"
+        )
+    else:
+        header = f"🎧 <b>{escape(result.title)}</b>"
+        if result.audio_url:
+            header += f"\n\n<i>Audio: {escape(result.audio_url)}</i>"
+        header += "\n\n"
+
+    for i, q in enumerate(result.questions, 1):
+        header += f"<b>{i}.</b> {escape(q)}\n"
+    header += f"\nSend your answers as one message (answer all {len(result.questions)})."
+    await target.answer(header, parse_mode="HTML")
 
 
 # ---------------------------------------------------------------------------
@@ -59,17 +103,17 @@ def _cards_keyboard(cards: list[CardDTO]) -> InlineKeyboardMarkup:
 @router.message(CommandStart())
 async def cmd_start(message: Message, backend: FromDishka[BackendClient]) -> None:
     structlog.contextvars.clear_contextvars()
-    contact_id = _contact_id(message)
-    identity = await backend.lookup_identity(_PLATFORM, contact_id)
+    cid = contact_id(message)
+    identity = await backend.lookup_identity(PLATFORM, cid)
     if identity:
-        structlog.contextvars.bind_contextvars(user_id=identity.user_id, contact_id=contact_id)
+        structlog.contextvars.bind_contextvars(user_id=identity.user_id, contact_id=cid)
         logger.info("cmd_start")
         await message.answer(
             "👋 Welcome back! Ready to learn?\n\n/session — reading\n/listen — listening\n/vocab — vocabulary",
             parse_mode="HTML",
         )
     else:
-        logger.info("cmd_start_no_profile", contact_id=contact_id)
+        logger.info("cmd_start_no_profile", contact_id=cid)
         await message.answer(
             "👋 Welcome! Your account isn't set up yet.\n\n"
             "Please use the main bot to complete onboarding first.",
@@ -78,35 +122,38 @@ async def cmd_start(message: Message, backend: FromDishka[BackendClient]) -> Non
 
 @router.message(Command("session"))
 async def cmd_session(message: Message, backend: FromDishka[BackendClient]) -> None:
+    """Auto-picks activity from profile learning strategy."""
     structlog.contextvars.clear_contextvars()
-    contact_id = _contact_id(message)
-    structlog.contextvars.bind_contextvars(contact_id=contact_id)
+    cid = contact_id(message)
+    structlog.contextvars.bind_contextvars(contact_id=cid)
     logger.info("cmd_session")
 
     await message.answer(messages.preparing_lesson())
     try:
-        result = await backend.start_reading_session(_PLATFORM, contact_id)
+        result = await backend.start_session(PLATFORM, cid)
     except Exception as e:
         await message.answer(messages.lesson_failed(str(e)))
         return
 
-    article_msg = (
-        f"📰 <b>{escape(result.title)}</b>\n\n"
-        f"{escape(result.content[:1500])}\n\n"
-        "---\nAnswer these questions:\n\n"
-    )
-    for i, q in enumerate(result.questions, 1):
-        article_msg += f"<b>{i}.</b> {escape(q)}\n"
-    article_msg += f"\nSend your answers as one message (answer all {len(result.questions)})."
+    await _send_session_result(message, result)
 
-    await message.answer(article_msg, parse_mode="HTML")
+
+@router.message(Command("lesson"))
+async def cmd_lesson(message: Message) -> None:
+    """Manual activity picker — choose reading, listening, or vocab."""
+    structlog.contextvars.clear_contextvars()
+    cid = contact_id(message)
+    structlog.contextvars.bind_contextvars(contact_id=cid)
+    logger.info("cmd_lesson")
+
+    await message.answer(messages.lesson_picker(), reply_markup=_lesson_keyboard())
 
 
 @router.message(Command("vocab"))
 async def cmd_vocab(message: Message, backend: FromDishka[BackendClient]) -> None:
     structlog.contextvars.clear_contextvars()
-    contact_id = _contact_id(message)
-    structlog.contextvars.bind_contextvars(contact_id=contact_id)
+    cid = contact_id(message)
+    structlog.contextvars.bind_contextvars(contact_id=cid)
 
     # Parse args: /vocab | /vocab 5 | /vocab university | /vocab university 5
     text = message.text or ""
@@ -135,7 +182,7 @@ async def cmd_vocab(message: Message, backend: FromDishka[BackendClient]) -> Non
     await message.answer(messages.fetching_vocab())
 
     try:
-        result = await backend.generate_vocab(_PLATFORM, contact_id, count, force_topic)
+        result = await backend.generate_vocab(PLATFORM, cid, count, force_topic)
     except Exception as e:
         await message.answer(messages.vocab_failed(str(e)))
         return
@@ -152,12 +199,12 @@ async def cmd_vocab(message: Message, backend: FromDishka[BackendClient]) -> Non
 @router.message(Command("repeat"))
 async def cmd_repeat(message: Message, backend: FromDishka[BackendClient]) -> None:
     structlog.contextvars.clear_contextvars()
-    contact_id = _contact_id(message)
-    structlog.contextvars.bind_contextvars(contact_id=contact_id)
+    cid = contact_id(message)
+    structlog.contextvars.bind_contextvars(contact_id=cid)
     logger.info("cmd_repeat")
 
     try:
-        result = await backend.get_repeat(_PLATFORM, contact_id)
+        result = await backend.get_repeat(PLATFORM, cid)
     except Exception as e:
         await message.answer(messages.vocab_failed(str(e)))
         return
@@ -196,10 +243,10 @@ async def cmd_help(message: Message) -> None:
 async def handle_answer(message: Message, backend: FromDishka[BackendClient]) -> None:
     """Handle user's answer to an active session question or writing exercise."""
     structlog.contextvars.clear_contextvars()
-    contact_id = _contact_id(message)
+    cid = contact_id(message)
 
     try:
-        active = await backend.get_active_session(_PLATFORM, contact_id)
+        active = await backend.get_active_session(PLATFORM, cid)
     except Exception:
         return  # backend unreachable — silently ignore
 
@@ -221,13 +268,16 @@ async def handle_answer(message: Message, backend: FromDishka[BackendClient]) ->
                 inline_keyboard=[
                     [
                         InlineKeyboardButton(
-                            text="✍️ Sentences", callback_data=f"{_CB_WRITING}:sentences"
+                            text="✍️ Sentences",
+                            callback_data=f"{CallbackAction.WRITING}:sentences",
                         ),
                         InlineKeyboardButton(
-                            text="📝 Grammar", callback_data=f"{_CB_WRITING}:grammar"
+                            text="📝 Grammar",
+                            callback_data=f"{CallbackAction.WRITING}:grammar",
                         ),
                         InlineKeyboardButton(
-                            text="📰 Essay", callback_data=f"{_CB_WRITING}:article"
+                            text="📰 Essay",
+                            callback_data=f"{CallbackAction.WRITING}:article",
                         ),
                     ]
                 ]
@@ -256,17 +306,63 @@ async def handle_answer(message: Message, backend: FromDishka[BackendClient]) ->
 
 
 # ---------------------------------------------------------------------------
+# /lesson picker callback
+# ---------------------------------------------------------------------------
+
+
+@router.callback_query(F.data.startswith(f"{CallbackAction.LESSON}:"))
+async def handle_lesson_choice(callback: CallbackQuery, backend: FromDishka[BackendClient]) -> None:
+    choice = (callback.data or "").split(":", 1)[1]
+    cid = str(callback.from_user.id)
+
+    await callback.answer()
+    if not isinstance(callback.message, Message):
+        return
+    # Remove picker keyboard
+    await callback.message.edit_reply_markup(reply_markup=None)
+
+    if choice == "vocab":
+        await callback.message.answer(messages.fetching_vocab())
+        try:
+            result = await backend.generate_vocab(PLATFORM, cid, 8)
+        except Exception as e:
+            await callback.message.answer(messages.vocab_failed(str(e)))
+            return
+        if not result.cards:
+            await callback.message.answer(messages.vocab_empty())
+            return
+        card_list = "\n".join(f"• {escape(c.word)} → {escape(c.translation)}" for c in result.cards)
+        response = f"{messages.vocab_header(result.topic, len(result.cards))}\n\n{card_list}"
+        await callback.message.answer(
+            response, parse_mode="HTML", reply_markup=_cards_keyboard(result.cards)
+        )
+        return
+
+    await callback.message.answer(messages.preparing_lesson())
+    try:
+        if choice == "reading":
+            result = await backend.start_reading_session(PLATFORM, cid)
+        else:  # listening
+            result = await backend.start_listening_session(PLATFORM, cid)
+    except Exception as e:
+        await callback.message.answer(messages.lesson_failed(str(e)))
+        return
+
+    await _send_session_result(callback.message, result)
+
+
+# ---------------------------------------------------------------------------
 # Writing exercise mode selection callback
 # ---------------------------------------------------------------------------
 
 
-@router.callback_query(F.data.startswith(f"{_CB_WRITING}:"))
+@router.callback_query(F.data.startswith(f"{CallbackAction.WRITING}:"))
 async def handle_writing_start(callback: CallbackQuery, backend: FromDishka[BackendClient]) -> None:
     mode = (callback.data or "").split(":", 1)[1]
-    contact_id = str(callback.from_user.id)
+    cid = str(callback.from_user.id)
 
     try:
-        active = await backend.get_active_session(_PLATFORM, contact_id)
+        active = await backend.get_active_session(PLATFORM, cid)
     except Exception:
         await callback.answer("Session expired")
         return
@@ -294,7 +390,7 @@ async def handle_writing_start(callback: CallbackQuery, backend: FromDishka[Back
 # ---------------------------------------------------------------------------
 
 
-@router.callback_query(F.data.startswith(f"{_CB_DEL_CARD}:"))
+@router.callback_query(F.data.startswith(f"{CallbackAction.DELETE_CARD}:"))
 async def handle_delete_card(callback: CallbackQuery) -> None:
     if not isinstance(callback.message, Message):
         return
@@ -308,7 +404,7 @@ async def handle_delete_card(callback: CallbackQuery) -> None:
         if callback.message.reply_markup:
             old_kb = callback.message.reply_markup.inline_keyboard
             new_rows = [
-                [btn for btn in row if not btn.callback_data == callback.data] for row in old_kb
+                [btn for btn in row if btn.callback_data != callback.data] for row in old_kb
             ]
             new_rows = [row for row in new_rows if row]
             if new_rows:
@@ -329,9 +425,9 @@ async def handle_unknown(message: Message, backend: FromDishka[BackendClient]) -
     """Reply with help for unrecognized messages that have no active session."""
     if message.text and message.text.startswith("/"):
         return
-    contact_id = _contact_id(message)
+    cid = contact_id(message)
     try:
-        active = await backend.get_active_session(_PLATFORM, contact_id)
+        active = await backend.get_active_session(PLATFORM, cid)
         if active.session_id is not None:
             return  # handle_answer will take it; don't double-respond
     except Exception:

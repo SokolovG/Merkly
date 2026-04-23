@@ -14,6 +14,12 @@ from backend.src.application.article_refill_service import ArticleRefillService
 from backend.src.application.listening_refill_service import ListeningRefillService
 from backend.src.application.listening_service import ListeningAgent
 from backend.src.application.ports.storage import Storage
+from backend.src.application.use_cases.resolve_user import UserResolverUseCase
+from backend.src.application.use_cases.start_session import StartSessionUseCase
+from backend.src.application.use_cases.vocab_use_case import (
+    CaptureWordUseCase,
+    GenerateVocabUseCase,
+)
 from backend.src.application.vocab_refill_service import VocabRefillService
 from backend.src.config import BackendSettings
 from backend.src.domain.ports.listening_history_repo import IListeningHistoryRepository
@@ -216,6 +222,51 @@ class AppProvider(Provider):
     @provide(scope=Scope.REQUEST)
     def session_store(self, storage: Storage) -> RedisSessionStore:
         return RedisSessionStore(storage)
+
+    # ── Use Cases ────────────────────────────────────────────────────────────
+
+    @provide(scope=Scope.REQUEST)
+    def user_resolver(
+        self,
+        identity_repo: IdentityRepository,
+        profile_repo: ProfileRepository,
+    ) -> UserResolverUseCase:
+        return UserResolverUseCase(identity_repo, profile_repo)
+
+    @provide(scope=Scope.REQUEST)
+    def start_session_uc(
+        self,
+        article_pool: ArticlePoolRepository,
+        session_history: ISessionHistoryRepository,
+        agent: LessonAgent,
+        store: RedisSessionStore,
+        listening_pool: IListeningPoolRepository,
+        listening_agent: ListeningAgent,
+    ) -> StartSessionUseCase:
+        return StartSessionUseCase(
+            article_pool=article_pool,
+            session_history=session_history,
+            agent=agent,
+            store=store,
+            listening_pool=listening_pool,
+            listening_agent=listening_agent,
+        )
+
+    @provide(scope=Scope.REQUEST)
+    def generate_vocab_uc(
+        self,
+        agent: LessonAgent,
+        repo: VocabPoolRepository,
+    ) -> GenerateVocabUseCase:
+        return GenerateVocabUseCase(agent=agent, repo=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def capture_word_uc(
+        self,
+        agent: LessonAgent,
+        repo: VocabPoolRepository,
+    ) -> CaptureWordUseCase:
+        return CaptureWordUseCase(agent=agent, repo=repo)
 
 
 def create_container():

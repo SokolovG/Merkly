@@ -59,6 +59,17 @@ class BackendClient:
 
     # --- Sessions ---
 
+    async def start_session(self, platform: str, contact_id: str) -> StartSessionResponse:
+        """Auto-pick activity from profile strategy."""
+        response = await self._client.post(
+            "/api/sessions/start",
+            json={"platform": platform, "contact_id": contact_id},
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        raw: dict[str, Any] = msgspec.json.decode(response.content)
+        return msgspec.convert(_unwrap(raw), StartSessionResponse)
+
     async def start_reading_session(self, platform: str, contact_id: str) -> StartSessionResponse:
         response = await self._client.post(
             "/api/sessions/reading/start",
@@ -92,7 +103,7 @@ class BackendClient:
     async def submit_answer(self, session_id: str, answer: str) -> AnswerResponse:
         response = await self._client.post(
             f"/api/sessions/{session_id}/answer",
-            json={"answer": answer},
+            json={"answers": [answer]},
             headers=self._headers(),
         )
         response.raise_for_status()

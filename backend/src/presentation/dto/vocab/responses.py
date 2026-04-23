@@ -22,3 +22,4 @@ class CaptureWordResponse(msgspec.Struct):
 
     card: CardDTO
     pool_card_id: str
+    already_exists: bool = False

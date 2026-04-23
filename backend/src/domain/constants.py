@@ -1,5 +1,3 @@
-"""Language data constants — single source of truth for all language-related lookups."""
-
 LANGUAGE_FLAGS: dict[str, str] = {
     "af": "🇿🇦",
     "ar": "🇸🇦",
@@ -165,3 +163,18 @@ ARTICLE_POOL_FILL_SIZE: int = 5  # articles to pre-fetch per refill batch
 
 LISTENING_POOL_THRESHOLD: int = 2  # refill when pool drops below this
 LISTENING_POOL_FILL_SIZE: int = 3  # lessons to pre-fetch per refill batch
+
+# Articles stripped during case-insensitive duplicate word matching.
+# Covers German (der/die/das), French (le/la/un/une), Spanish (los/las), English (the).
+STRIP_ARTICLES: tuple[str, ...] = (
+    "der ",
+    "die ",
+    "das ",
+    "le ",
+    "la ",
+    "los ",
+    "las ",
+    "the ",
+    "un ",
+    "une ",
+)
