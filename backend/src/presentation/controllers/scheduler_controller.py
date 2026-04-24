@@ -30,8 +30,8 @@ from backend.src.presentation.responses.base import SuccessResponse
 class SchedulerController(Controller):
     path = "/scheduler"
 
-    @inject
     @get("/reminders/due")
+    @inject
     async def get_due_reminders(
         self,
         identity_repo: FromDishka[IdentityRepository],
@@ -62,8 +62,8 @@ class SchedulerController(Controller):
             data=DueRemindersResponse(reminders=reminders), message="Due reminders fetched"
         )
 
-    @inject
     @post("/reminders/{user_id:str}/mark-sent")
+    @inject
     async def mark_reminder_sent(
         self,
         user_id: str,
@@ -92,8 +92,8 @@ class SchedulerController(Controller):
 
         await profile_repo.update_next_reminder_at(uid, candidate)
 
-    @inject
     @post("/vocab/{user_id:str}")
+    @inject
     async def generate_scheduled_vocab(
         self,
         user_id: str,

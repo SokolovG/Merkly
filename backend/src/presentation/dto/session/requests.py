@@ -34,3 +34,12 @@ class SubmitWritingRequest(msgspec.Struct):
     """POST /sessions/{session_id}/writing"""
 
     text: str
+
+
+class StartWritingSessionRequest(msgspec.Struct):
+    """POST /sessions/writing/start"""
+
+    platform: Platform
+    contact_id: str
+    theme_id: str  # UUID from writing_theme_pool — backend looks up theme text
+    mode: str = "article"  # sentences | grammar | article

@@ -14,8 +14,8 @@ from backend.src.presentation.responses.base import SuccessResponse
 class IdentityController(Controller):
     path = "/identity"
 
-    @inject
     @get("/lookup")
+    @inject
     async def lookup_identity(
         self,
         platform: str = Parameter(query="platform"),

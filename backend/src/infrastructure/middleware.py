@@ -1,10 +1,12 @@
 import logging
+from collections.abc import Callable, MutableMapping
+from typing import Any
 
 import msgspec
 from litestar.exceptions import HTTPException
 from litestar.middleware import AbstractMiddleware
 from litestar.status_codes import HTTP_500_INTERNAL_SERVER_ERROR
-from litestar.types import Receive, Scope, Send
+from litestar.types import Message, Receive, Scope, Send
 
 from backend.src.infrastructure.exceptions import ApiException
 from backend.src.presentation.responses import ErrorResponse
@@ -14,16 +16,34 @@ logger = logging.getLogger(__name__)
 _CONTENT_TYPE_HEADER = (b"content-type", b"application/json")
 
 
+def _make_logging_send(send: Send, state: MutableMapping[str, Any]) -> Callable:
+    async def logging_send(message: Message) -> None:
+        if message["type"] == "http.response.start":
+            state["status_code"] = message["status"]
+        elif message["type"] == "http.response.body":
+            status = state.get("status_code", 0)
+            if status >= 400:
+                body = message.get("body", b"")
+                if status >= 500:
+                    logger.error("Response %d: %s", status, body.decode(errors="replace"))
+                else:
+                    logger.warning("Response %d: %s", status, body.decode(errors="replace"))
+        await send(message)
+
+    return logging_send
+
+
 class ErrorHandlerMiddleware(AbstractMiddleware):
-    """Uniform JSON error responses for every unhandled exception."""
+    """Uniform JSON error responses + response-level logging for 4xx/5xx."""
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
+        state: MutableMapping[str, Any] = {}
         try:
-            await self.app(scope, receive, send)
+            await self.app(scope, receive, _make_logging_send(send, state))
         except Exception as exc:
             await self._handle(exc, send)
 

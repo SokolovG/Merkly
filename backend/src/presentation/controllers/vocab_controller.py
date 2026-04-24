@@ -28,8 +28,8 @@ from backend.src.presentation.responses.base import SuccessResponse
 class VocabController(Controller):
     path = "/vocab"
 
-    @inject
     @post("/generate")
+    @inject
     async def generate_vocab(
         self,
         data: GenerateVocabRequest,
@@ -50,8 +50,8 @@ class VocabController(Controller):
             message="Vocab cards served from pool" if result.from_pool else "Vocab cards generated",
         )
 
-    @inject
     @get("/repeat")
+    @inject
     async def repeat_vocab(
         self,
         resolver: FromDishka[UserResolverUseCase],
@@ -83,8 +83,8 @@ class VocabController(Controller):
             message="Repeat cards fetched",
         )
 
-    @inject
     @post("/word")
+    @inject
     async def capture_word(
         self,
         data: CaptureWordRequest,
@@ -118,8 +118,8 @@ class VocabController(Controller):
             message="Word already in history" if result.already_exists else "Word captured",
         )
 
-    @inject
     @post("/word/regenerate")
+    @inject
     async def regenerate_word(
         self,
         data: RegenerateWordRequest,

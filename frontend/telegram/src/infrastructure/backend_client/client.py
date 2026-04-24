@@ -18,8 +18,10 @@ from src.infrastructure.backend_client.types import (
     IdentityLookupResponse,
     RepeatVocabResponse,
     StartSessionResponse,
+    StartWritingSessionResponse,
     VocabResponse,
     WritingResponse,
+    WritingThemesResponse,
 )
 
 
@@ -119,6 +121,35 @@ class BackendClient:
         response.raise_for_status()
         raw: dict[str, Any] = msgspec.json.decode(response.content)
         return msgspec.convert(_unwrap(raw), WritingResponse)
+
+    async def get_writing_themes(
+        self, platform: str, contact_id: str, count: int = 1
+    ) -> WritingThemesResponse:
+        response = await self._client.get(
+            "/api/sessions/writing/themes",
+            params={"platform": platform, "contact_id": contact_id, "count": count},
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        raw: dict[str, Any] = msgspec.json.decode(response.content)
+        return msgspec.convert(_unwrap(raw), WritingThemesResponse)
+
+    async def start_writing_session(
+        self, platform: str, contact_id: str, theme_id: str, mode: str = "article"
+    ) -> StartWritingSessionResponse:
+        response = await self._client.post(
+            "/api/sessions/writing/start",
+            json={
+                "platform": platform,
+                "contact_id": contact_id,
+                "theme_id": theme_id,
+                "mode": mode,
+            },
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        raw: dict[str, Any] = msgspec.json.decode(response.content)
+        return msgspec.convert(_unwrap(raw), StartWritingSessionResponse)
 
     # --- Vocab ---
 

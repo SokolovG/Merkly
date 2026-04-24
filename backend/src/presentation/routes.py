@@ -3,6 +3,8 @@ from litestar import Litestar, Router
 from litestar.connection import ASGIConnection
 from litestar.exceptions import NotAuthorizedException
 from litestar.handlers.base import BaseRouteHandler
+from litestar.openapi import OpenAPIConfig
+from litestar.openapi.spec import Contact
 
 from backend.src.config import BackendSettings
 from backend.src.dependencies import create_container
@@ -40,10 +42,19 @@ api_router = Router(
 )
 
 
+_openapi_config = OpenAPIConfig(
+    title="Merkly API",
+    version="0.1.0",
+    description="Language learning backend — sessions, vocab, identity, scheduler.",
+    contact=Contact(name="Merkly", email="admin@merkly.app"),
+)
+
+
 def create_app() -> Litestar:
     app = Litestar(
         route_handlers=[api_router],
         middleware=[ErrorHandlerMiddleware],
+        openapi_config=_openapi_config,
     )
     container = create_container()
     setup_dishka(container, app)

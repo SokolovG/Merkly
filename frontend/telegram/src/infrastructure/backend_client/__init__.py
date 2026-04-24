@@ -7,8 +7,11 @@ from src.infrastructure.backend_client.types import (
     IdentityLookupResponse,
     RepeatVocabResponse,
     StartSessionResponse,
+    StartWritingSessionResponse,
     VocabResponse,
     WritingResponse,
+    WritingThemeDTO,
+    WritingThemesResponse,
 )
 
 __all__ = [
@@ -19,6 +22,9 @@ __all__ = [
     "ActiveSessionResponse",
     "AnswerResponse",
     "WritingResponse",
+    "WritingThemeDTO",
+    "WritingThemesResponse",
+    "StartWritingSessionResponse",
     "VocabResponse",
     "RepeatVocabResponse",
     "CaptureWordResponse",

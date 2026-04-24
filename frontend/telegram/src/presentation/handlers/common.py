@@ -19,6 +19,12 @@ class CallbackAction(StrEnum):
     WRITING = "writing"
     WORD_OK = "word_ok"
     WORD_REGEN = "word_regen"
+    NEXT_READING = "nread"
+    NEXT_LISTENING = "nlisten"
+    NEXT_WRITING = "nwrite"
+    WRITING_START = "wstart"  # wstart:{theme_id} — start writing with this theme
+    WRITING_ANOTHER = "wanother"  # fetch another random theme, edit message in place
+    WRITING_CHOOSE = "wchoose"  # expand to full theme list picker
 
 
 def contact_id(message: Message) -> str:

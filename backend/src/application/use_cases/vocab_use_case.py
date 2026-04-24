@@ -5,6 +5,7 @@ from backend.src.application.agent.core import LessonAgent
 from backend.src.domain.constants import STRIP_ARTICLES
 from backend.src.domain.entities import PooledVocabCard, UserProfile, VocabCard
 from backend.src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
+from backend.src.infrastructure.exceptions import InternalServerError
 
 
 @dataclass(frozen=True)
@@ -41,25 +42,31 @@ class GenerateVocabUseCase:
         count: int | None = None,
         force_topic: str | None = None,
     ) -> VocabResult:
-        card_count = count or profile.vocab_card_count
-        pool_cards = await self._repo.get_pool_cards(
-            profile.id, str(profile.target_lang), card_count
-        )
+        try:
+            card_count = count or profile.vocab_card_count
+            pool_cards = await self._repo.get_pool_cards(
+                profile.id, str(profile.target_lang), card_count
+            )
 
-        if pool_cards:
-            await self._repo.mark_shown(profile.id, [c.id for c in pool_cards])
-            return VocabResult(topic="Vocabulary", cards=pool_cards, from_pool=True)
+            if pool_cards:
+                await self._repo.mark_shown(profile.id, [c.id for c in pool_cards])
+                return VocabResult(topic="Vocabulary", cards=pool_cards, from_pool=True)
 
-        actual_topic, vocab_cards = await self._agent.topic_vocab_lesson(
-            level=profile.level,
-            goal=str(profile.goal),
-            native_lang=str(profile.native_lang),
-            target_lang=str(profile.target_lang),
-            recent_topics=[],
-            count=card_count,
-            force_topic=force_topic,
-        )
-        return VocabResult(topic=actual_topic, cards=vocab_cards, from_pool=False)
+            actual_topic, vocab_cards = await self._agent.topic_vocab_lesson(
+                level=profile.level,
+                goal=str(profile.goal),
+                native_lang=str(profile.native_lang),
+                target_lang=str(profile.target_lang),
+                recent_topics=[],
+                count=card_count,
+                force_topic=force_topic,
+            )
+            return VocabResult(topic=actual_topic, cards=vocab_cards, from_pool=False)
+        except Exception as exc:
+            raise InternalServerError(
+                message="Failed to generate vocab",
+                details={"user_id": str(profile.id), "force_topic": force_topic},
+            ) from exc
 
 
 class CaptureWordUseCase:
@@ -74,14 +81,22 @@ class CaptureWordUseCase:
         context: str | None = None,
     ) -> WordCaptureResult:
         """Duplicate check → LLM generation. Returns already_exists=True on duplicate."""
-        history = await self._repo.get_history_words(
-            profile.id, str(profile.target_lang), limit=10_000
-        )
-        normalized_input = _normalize_word(word)
-        if any(_normalize_word(w) == normalized_input for w in history):
-            return WordCaptureResult(already_exists=True)
+        try:
+            history = await self._repo.get_history_words(
+                profile.id, str(profile.target_lang), limit=10_000
+            )
+            normalized_input = _normalize_word(word)
+            if any(_normalize_word(w) == normalized_input for w in history):
+                return WordCaptureResult(already_exists=True)
 
-        return await self._call_llm(profile, word, context)
+            return await self._call_llm(profile, word, context)
+        except InternalServerError:
+            raise
+        except Exception as exc:
+            raise InternalServerError(
+                message="Failed to capture word",
+                details={"user_id": str(profile.id), "word": word},
+            ) from exc
 
     async def execute_regen(
         self,
@@ -90,7 +105,15 @@ class CaptureWordUseCase:
         context: str,
     ) -> WordCaptureResult:
         """Bypass duplicate check — user explicitly requested regeneration with new context."""
-        return await self._call_llm(profile, word, context)
+        try:
+            return await self._call_llm(profile, word, context)
+        except InternalServerError:
+            raise
+        except Exception as exc:
+            raise InternalServerError(
+                message="Failed to regenerate word",
+                details={"user_id": str(profile.id), "word": word},
+            ) from exc
 
     async def _call_llm(
         self,

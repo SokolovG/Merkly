@@ -26,8 +26,8 @@ def _apply_update(profile: UserProfile, data: UpdateProfileRequest) -> UserProfi
 class ProfileController(Controller):
     path = "/profiles"
 
-    @inject
     @get("/{user_id:str}")
+    @inject
     async def get_profile(
         self,
         user_id: str,
@@ -45,8 +45,8 @@ class ProfileController(Controller):
 
         return SuccessResponse(data=profile_to_response(profile), message="Profile fetched")
 
-    @inject
     @patch("/{user_id:str}")
+    @inject
     async def update_profile(
         self,
         user_id: str,

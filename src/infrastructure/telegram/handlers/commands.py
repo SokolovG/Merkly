@@ -19,10 +19,10 @@ from src.application.vocab_refill_service import VocabRefillService
 from src.domain.entities import Session, VocabCard
 from src.domain.enums import ActivityType, Platform
 from src.domain.ports.card_gateway import ICardGateway
+from src.domain.ports.session_history_repo import ISessionHistoryRepository
 from src.infrastructure.database.repositories import ProfileRepository, SessionRepository
 from src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
 from src.infrastructure.database.repositories.identity_repo import IdentityRepository
-from src.infrastructure.database.repositories.session_history_repo import SessionHistoryRepository
 from src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from src.infrastructure.telegram.messages import (
     all_cards_deleted,
@@ -128,7 +128,7 @@ async def cmd_session(
     profile_repo: FromDishka[ProfileRepository],
     identity_repo: FromDishka[IdentityRepository],
     session_repo: FromDishka[SessionRepository],
-    session_history_repo: FromDishka[SessionHistoryRepository],
+    session_history_repo: FromDishka[ISessionHistoryRepository],
     agent: FromDishka[LessonAgent],
     article_pool_repo: FromDishka[ArticlePoolRepository],
     article_refill_service: FromDishka[ArticleRefillService],

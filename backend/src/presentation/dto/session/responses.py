@@ -34,3 +34,24 @@ class WritingResponse(msgspec.Struct):
 
     feedback: str
     cards: list[CardDTO]
+
+
+class WritingThemeDTO(msgspec.Struct):
+    """A single writing theme from the pool, with its DB id."""
+
+    id: str
+    theme: str
+
+
+class WritingThemesResponse(msgspec.Struct):
+    """Response for GET /sessions/writing/themes."""
+
+    themes: list[WritingThemeDTO]
+
+
+class StartWritingSessionResponse(msgspec.Struct):
+    """Response for POST /sessions/writing/start."""
+
+    session_id: str
+    task: str  # writing task instructions to show the user
+    theme: str

@@ -57,3 +57,18 @@ class CaptureWordResponse(msgspec.Struct):
     card: CardDTO
     pool_card_id: str
     already_exists: bool = False
+
+
+class WritingThemeDTO(msgspec.Struct):
+    id: str
+    theme: str
+
+
+class WritingThemesResponse(msgspec.Struct):
+    themes: list[WritingThemeDTO]
+
+
+class StartWritingSessionResponse(msgspec.Struct):
+    session_id: str
+    task: str  # writing task instructions shown to the user
+    theme: str

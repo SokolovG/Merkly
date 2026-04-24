@@ -94,6 +94,13 @@ class PooledListeningLesson(msgspec.Struct):
     level: str
 
 
+class WritingTheme(msgspec.Struct):
+    id: uuid.UUID
+    theme: str
+    target_lang: str
+    level: str | None = None  # None = suitable for all levels
+
+
 class Session(msgspec.Struct):
     session_id: str
     user_id: uuid.UUID

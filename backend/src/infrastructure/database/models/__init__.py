@@ -8,6 +8,12 @@ from backend.src.infrastructure.database.models.session_history_model import Ses
 from backend.src.infrastructure.database.models.session_model import SessionModel
 from backend.src.infrastructure.database.models.vocab_history_model import VocabHistoryModel
 from backend.src.infrastructure.database.models.vocab_pool_model import VocabPoolModel
+from backend.src.infrastructure.database.models.writing_theme_history_model import (
+    WritingThemeHistoryModel,
+)
+from backend.src.infrastructure.database.models.writing_theme_pool_model import (
+    WritingThemePoolModel,
+)
 
 __all__ = [
     "Base",
@@ -20,4 +26,6 @@ __all__ = [
     "ArticlePoolModel",
     "ListeningPoolModel",
     "ListeningHistoryModel",
+    "WritingThemePoolModel",
+    "WritingThemeHistoryModel",
 ]

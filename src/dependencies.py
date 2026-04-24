@@ -78,11 +78,11 @@ class AppProvider(Provider):
     def vocab_pool_repo(self, session: AsyncSession) -> VocabPoolRepository:
         return VocabPoolRepository(session)
 
-    @provide(scope=Scope.REQUEST, provides=ISessionHistoryRepository)
-    def session_history_repo(self, session: AsyncSession) -> SessionHistoryRepository:
+    @provide(scope=Scope.REQUEST)
+    def session_history_repo(self, session: AsyncSession) -> ISessionHistoryRepository:
         return SessionHistoryRepository(session)
 
-    @provide(scope=Scope.APP, provides=LLMClient)
+    @provide(scope=Scope.APP)
     def llm(self, settings: Settings) -> LLMClient:
         return LLMClient(
             base_url=settings.LLM_BASE_URL,
@@ -90,7 +90,7 @@ class AppProvider(Provider):
             model=settings.LLM_MODEL,
         )
 
-    @provide(scope=Scope.APP, provides=NewsArticleFetcher)
+    @provide(scope=Scope.APP)
     def article_fetcher(self) -> NewsArticleFetcher:
         return NewsArticleFetcher()
 
@@ -168,12 +168,12 @@ class AppProvider(Provider):
     ) -> ArticleRefillService:
         return ArticleRefillService(agent=agent, repo=repo)
 
-    @provide(scope=Scope.REQUEST, provides=IListeningPoolRepository)
-    def listening_pool_repo(self, session: AsyncSession) -> ListeningPoolRepository:
+    @provide(scope=Scope.REQUEST)
+    def listening_pool_repo(self, session: AsyncSession) -> IListeningPoolRepository:
         return ListeningPoolRepository(session)
 
-    @provide(scope=Scope.REQUEST, provides=IListeningHistoryRepository)
-    def listening_history_repo(self, session: AsyncSession) -> ListeningHistoryRepository:
+    @provide(scope=Scope.REQUEST)
+    def listening_history_repo(self, session: AsyncSession) -> IListeningHistoryRepository:
         return ListeningHistoryRepository(session)
 
     @provide(scope=Scope.REQUEST)

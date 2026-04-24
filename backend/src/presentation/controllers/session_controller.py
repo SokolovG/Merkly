@@ -14,6 +14,7 @@ from litestar.params import Parameter
 from backend.src.application.agent.core import LessonAgent
 from backend.src.application.use_cases.resolve_user import UserResolverUseCase
 from backend.src.application.use_cases.start_session import StartSessionUseCase
+from backend.src.application.use_cases.writing_use_case import WritingUseCase
 from backend.src.domain.enums import ActivityType, Platform
 from backend.src.infrastructure.database.repositories.profile_repo import ProfileRepository
 from backend.src.infrastructure.exceptions import ApiException
@@ -23,6 +24,7 @@ from backend.src.presentation.dto.session.requests import (
     StartListeningSessionRequest,
     StartReadingSessionRequest,
     StartSessionRequest,
+    StartWritingSessionRequest,
     SubmitAnswerRequest,
     SubmitWritingRequest,
 )
@@ -30,7 +32,10 @@ from backend.src.presentation.dto.session.responses import (
     ActiveSessionResponse,
     AnswerResponse,
     StartSessionResponse,
+    StartWritingSessionResponse,
     WritingResponse,
+    WritingThemeDTO,
+    WritingThemesResponse,
 )
 from backend.src.presentation.responses.base import SuccessResponse
 
@@ -38,8 +43,8 @@ from backend.src.presentation.responses.base import SuccessResponse
 class SessionController(Controller):
     path = "/sessions"
 
-    @inject
     @post("/start")
+    @inject
     async def start_session(
         self,
         data: StartSessionRequest,
@@ -61,8 +66,8 @@ class SessionController(Controller):
             message="Session started",
         )
 
-    @inject
     @post("/reading/start")
+    @inject
     async def start_reading_session(
         self,
         data: StartReadingSessionRequest,
@@ -82,8 +87,8 @@ class SessionController(Controller):
             message="Reading session started",
         )
 
-    @inject
     @post("/listening/start")
+    @inject
     async def start_listening_session(
         self,
         data: StartListeningSessionRequest,
@@ -104,8 +109,8 @@ class SessionController(Controller):
             message="Listening session started",
         )
 
-    @inject
     @get("/active")
+    @inject
     async def get_active_session(
         self,
         resolver: FromDishka[UserResolverUseCase],
@@ -145,8 +150,63 @@ class SessionController(Controller):
             message="Active session found",
         )
 
+    @get("/writing/themes")
     @inject
+    async def get_writing_themes(
+        self,
+        resolver: FromDishka[UserResolverUseCase],
+        writing_uc: FromDishka[WritingUseCase],
+        platform: str = Parameter(query="platform"),
+        contact_id: str = Parameter(query="contact_id"),
+        count: int = Parameter(query="count", default=1),
+    ) -> SuccessResponse:
+        """Return writing topics from the pool suited to user's language + level.
+
+        count=1 (default) for the random-theme flow.
+        count=5 for the choose-theme picker.
+        """
+        try:
+            platform_enum = Platform(platform)
+        except ValueError:
+            raise ApiException(
+                message=f"Unknown platform: {platform!r}",
+                status_code=400,
+                error_code="VALIDATION_ERROR",
+            )
+
+        ctx = await resolver.resolve(platform_enum, contact_id)
+        themes = await writing_uc.get_themes(ctx.profile, limit=count)
+        return SuccessResponse(
+            data=WritingThemesResponse(
+                themes=[WritingThemeDTO(id=str(t.id), theme=t.theme) for t in themes]
+            ),
+            message="Writing themes fetched",
+        )
+
+    @post("/writing/start")
+    @inject
+    async def start_writing_session(
+        self,
+        data: StartWritingSessionRequest,
+        resolver: FromDishka[UserResolverUseCase],
+        writing_uc: FromDishka[WritingUseCase],
+    ) -> SuccessResponse:
+        """Generate a standalone writing task for the given theme and create a writing session."""
+        ctx = await resolver.resolve(data.platform, data.contact_id)
+        result = await writing_uc.start(
+            ctx.profile, ctx.identity, theme_id=uuid.UUID(data.theme_id), mode=data.mode
+        )
+        return SuccessResponse(
+            data=StartWritingSessionResponse(
+                session_id=result.session_id,
+                task=result.task,
+                theme=result.theme,
+            ),
+            message="Writing session started",
+        )
+
     @post("/{session_id:str}/answer")
+    @inject
     async def submit_answer(
         self,
         session_id: str,
@@ -198,8 +258,8 @@ class SessionController(Controller):
             message="Answers reviewed",
         )
 
-    @inject
     @post("/{session_id:str}/writing")
+    @inject
     async def submit_writing(
         self,
         session_id: str,
@@ -218,7 +278,9 @@ class SessionController(Controller):
                 status_code=409,
             )
 
-        writing_task = await agent.generate_writing_task(
+        # Standalone writing sessions pre-generate the task and store it.
+        # Article-backed sessions generate it here from the article text.
+        writing_task = session.get("writing_task_text") or await agent.generate_writing_task(
             article_text=session["text"],
             target_lang=session["target_lang"],
             level=session["level"],

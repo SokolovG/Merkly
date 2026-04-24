@@ -1,16 +1,18 @@
+import json
 from dataclasses import dataclass
-from enum import Enum
 
 import structlog
 
 from backend.src.application.agent.prompts import (
     build_review_prompt,
+    build_standalone_writing_task_prompt,
     build_system_prompt,
     build_topic_vocab_prompt,
     build_vocab_prompt,
     build_word_capture_prompt,
     build_writing_review_prompt,
     build_writing_task_prompt,
+    build_writing_themes_prompt,
     lang_name,
     strip_article_from_word,
 )
@@ -32,11 +34,6 @@ class LessonResult:
     questions: list[str]
     feedback: str
     cards_created: list[VocabCard]
-
-
-class CardBackend(Enum):
-    MOCHI = "mochi"
-    ANKI = "anki"
 
 
 logger = structlog.get_logger(__name__)
@@ -180,6 +177,49 @@ class LessonAgent:
             response.content
             or "Write 2–3 sentences about something you found interesting in the article."
         )
+
+    async def generate_writing_themes(
+        self,
+        target_lang: str,
+        native_lang: str,
+        level: str,
+        count: int = 5,
+    ) -> list[str]:
+        """Return a list of writing topic strings for the given language/level."""
+        messages = [
+            Message(role="system", content=build_system_prompt(target_lang)),
+            Message(
+                role="user",
+                content=build_writing_themes_prompt(target_lang, native_lang, level, count),
+            ),
+        ]
+        response = await self._llm.complete(messages, tools=[])
+        raw = (response.content or "").strip()
+        try:
+            themes: list[str] = json.loads(raw)
+            return [str(t) for t in themes[:count]]
+        except (json.JSONDecodeError, TypeError):
+            # LLM didn't return valid JSON — extract lines as fallback
+            lines = [ln.strip().strip('"').strip("'").strip("-").strip() for ln in raw.splitlines()]
+            return [ln for ln in lines if ln][:count]
+
+    async def generate_standalone_writing_task(
+        self,
+        theme: str,
+        target_lang: str,
+        level: str,
+        mode: str = "article",
+    ) -> str:
+        """Generate a writing task for a theme with no article context."""
+        messages = [
+            Message(role="system", content=build_system_prompt(target_lang)),
+            Message(
+                role="user",
+                content=build_standalone_writing_task_prompt(theme, target_lang, level, mode),
+            ),
+        ]
+        response = await self._llm.complete(messages, tools=[])
+        return response.content or f"Write a 200-word text about: {theme}"
 
     async def review_writing(
         self,

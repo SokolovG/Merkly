@@ -1,24 +1,6 @@
-LANG_SOURCES: dict[str, list[str]] = {
-    "de": [
-        "https://www.tagesschau.de/xml/rss2/",
-        "https://rss.dw.com/rdf/rss-de-news",
-        "https://www.spiegel.de/schlagzeilen/index.rss",
-    ],
-    "en": [
-        "https://feeds.bbci.co.uk/news/rss.xml",
-        "https://rss.reuters.com/reuters/topNews",
-    ],
-    "es": [
-        "https://www.bbc.com/mundo/index.xml",
-        "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
-    ],
-    "fr": [
-        "https://www.france24.com/fr/rss",
-        "https://www.lemonde.fr/rss/une.xml",
-    ],
-    "it": ["https://www.ansa.it/sito/notizie/topnews/topnews_rss.xml"],
-    "pt": ["https://g1.globo.com/rss/g1/"],
-}
+import random
+
+from backend.src.domain.constants import LANG_RSS_SOURCES as LANG_SOURCES
 
 LANG_NAMES: dict[str, str] = {
     "de": "German",
@@ -47,13 +29,14 @@ def lang_name(code: str) -> str:
 
 def build_system_prompt(target_lang: str) -> str:
     name = lang_name(target_lang)
-    sources = LANG_SOURCES.get(target_lang, LANG_SOURCES.get("en", []))
+    sources = list(LANG_SOURCES.get(target_lang, LANG_SOURCES.get("en", [])))
+    random.shuffle(sources)  # vary starting point so all topics get coverage over time
     sources_str = "\n".join(f"  {i + 1}. {url}" for i, url in enumerate(sources))
     source_section = (
         (
-            f"\nAvailable {name} news sources (try in order, pass as source_url):\n{sources_str}\n"
-            "If one source fails, call fetch_article again with the next source_url. "
-            "Keep trying until an article is successfully fetched."
+            f"\nAvailable {name} sources — pick the FIRST one in the list below and fetch from it. "
+            f"If it fails, try the next. Do not skip to a later source without trying the earlier one first.\n"
+            f"{sources_str}\n"
         )
         if sources_str
         else ""
@@ -379,3 +362,60 @@ Instructions:
 Do NOT be overly positive if the answers are incomplete. The student should know exactly what they missed.
 Do NOT create flashcards — this is comprehension feedback only.
 """.strip()
+
+
+def build_writing_themes_prompt(
+    target_lang: str, native_lang: str, level: str, count: int = 5
+) -> str:
+    name = lang_name(target_lang)
+    native_name = lang_name(native_lang)
+    return (
+        f"Generate {count} writing topics for a {level} {name} student (native: {native_name}).\n\n"
+        f"Topics must be:\n"
+        f"- Written entirely in {name}\n"
+        f"- Appropriate for {level} level (vocabulary and concepts)\n"
+        f"- Suitable for a 200-300 word essay or opinion text\n"
+        f"- Varied: mix social, cultural, everyday, and academic themes\n"
+        f"- Clear and specific enough to write about without extra context\n\n"
+        f"Reply with ONLY a JSON array of {count} topic strings in {name}, nothing else.\n"
+        f'Output format: ["<topic 1>", "<topic 2>", ...]'
+    )
+
+
+def build_standalone_writing_task_prompt(
+    theme: str, target_lang: str, level: str, mode: str = "article"
+) -> str:
+    name = lang_name(target_lang)
+
+    if mode == "article":
+        return (
+            f"Create a structured writing task for a {level} {name} student on this topic:\n\n"
+            f'"{theme}"\n\n'
+            f"The task should:\n"
+            f"- Require a text of 200-250 words\n"
+            f"- Specify the text type (Erörterung, Stellungnahme, Kommentar, or Bericht)\n"
+            f"- List 2-3 specific points the student must address\n"
+            f"- Resemble an exam writing prompt (e.g. telc B2, Goethe, EPD format)\n\n"
+            f"Reply ONLY with the task instructions in {name}, nothing else."
+        )
+
+    if mode == "grammar":
+        return (
+            f"Create a grammar-focused writing task for a {level} {name} student on this topic:\n\n"
+            f'"{theme}"\n\n'
+            f"Pick ONE grammar structure appropriate for {level} "
+            f"(e.g. Konjunktiv II, Passiv, Relativsätze, Modalverben, Genitive).\n"
+            f"Ask the student to write 3-5 sentences using that structure, related to the topic.\n"
+            f"Name the grammar structure clearly and give a brief example.\n\n"
+            f"Reply ONLY with the task instructions in {name}, nothing else."
+        )
+
+    # sentences (default)
+    return (
+        f"Create a short writing task for a {level} {name} student on this topic:\n\n"
+        f'"{theme}"\n\n'
+        f"Pick 2-3 words or phrases related to the topic appropriate for {level}.\n"
+        f"Ask the student to write 2-3 sentences using those words.\n"
+        f"Be specific: name the exact words and what to write about.\n\n"
+        f"Reply ONLY with the task instructions in {name}, nothing else."
+    )

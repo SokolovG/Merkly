@@ -5,37 +5,12 @@ import xml.etree.ElementTree as ET
 import httpx
 import structlog
 
+from backend.src.domain.constants import LANG_RSS_SOURCES as _DEFAULT_SOURCES
 from backend.src.domain.ports.article_fetcher import Article, IArticleFetcher
 from backend.src.infrastructure.decorators import retry
 from backend.src.infrastructure.exceptions import FetcherError
 
 logger = structlog.get_logger(__name__)
-
-# Default RSS sources per language — agent can override with source_url
-_DEFAULT_SOURCES: dict[str, list[str]] = {
-    "de": [
-        "https://www.tagesschau.de/xml/rss2/",
-        "https://rss.dw.com/rdf/rss-de-news",
-    ],
-    "en": [
-        "https://feeds.bbci.co.uk/news/rss.xml",
-        "https://rss.reuters.com/reuters/topNews",
-    ],
-    "es": [
-        "https://www.bbc.com/mundo/index.xml",
-        "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",
-    ],
-    "fr": [
-        "https://www.france24.com/fr/rss",
-        "https://www.lemonde.fr/rss/une.xml",
-    ],
-    "it": [
-        "https://www.ansa.it/sito/notizie/topnews/topnews_rss.xml",
-    ],
-    "pt": [
-        "https://g1.globo.com/rss/g1/",
-    ],
-}
 
 
 def _truncate(text: str, max_words: int = 300) -> str:
@@ -66,8 +41,12 @@ class NewsArticleFetcher(IArticleFetcher):
     async def fetch(
         self, level: str, language: str = "de", source_url: str | None = None
     ) -> Article:
-        """Fetch from source_url if given, otherwise use a default for the language."""
-        url = source_url or _DEFAULT_SOURCES.get(language, _DEFAULT_SOURCES["en"])[0]
+        """Fetch from source_url if given, otherwise pick a random source for the language."""
+        if source_url:
+            url = source_url
+        else:
+            sources = _DEFAULT_SOURCES.get(language, _DEFAULT_SOURCES["en"])
+            url = random.choice(sources)
         return await self._fetch_from_rss(url, level)
 
     async def _fetch_from_rss(self, feed_url: str, level: str) -> Article:

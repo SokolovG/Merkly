@@ -3,6 +3,7 @@ import logging
 
 import structlog
 from aiogram import Bot, Dispatcher
+from aiogram.types import BotCommand
 from dishka.integrations.aiogram import setup_dishka
 
 from src.config.di import build_container
@@ -17,7 +18,6 @@ def configure_structlog(debug: bool) -> None:
     processors: list = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
     ]
@@ -48,9 +48,23 @@ def setup_bot(settings: TgSettings) -> tuple[Bot, Dispatcher]:
     dp.include_router(catch_all_router)  # must be last
 
     container = build_container(settings)
-    setup_dishka(container=container, router=dp)
+    setup_dishka(container=container, router=dp, auto_inject=True)
 
     return bot, dp
+
+
+_BOT_COMMANDS = [
+    BotCommand(command="session", description="Auto-start a lesson"),
+    BotCommand(command="reading", description="Start a reading session"),
+    BotCommand(command="listen", description="Start a listening session"),
+    BotCommand(command="writing", description="Standalone writing task"),
+    BotCommand(command="next", description="Skip current step, start new session activity"),
+    BotCommand(command="lesson", description="Pick lesson type manually"),
+    BotCommand(command="vocab", description="Vocabulary cards"),
+    BotCommand(command="repeat", description="Review saved word history"),
+    BotCommand(command="exit", description="Cancel the active session"),
+    BotCommand(command="help", description="Show help"),
+]
 
 
 async def main() -> None:
@@ -58,6 +72,7 @@ async def main() -> None:
     configure_structlog(settings.DEBUG)
 
     bot, dp = setup_bot(settings)
+    await bot.set_my_commands(_BOT_COMMANDS)
     await dp.start_polling(bot)
 
 

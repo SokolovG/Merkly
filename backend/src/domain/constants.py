@@ -164,6 +164,58 @@ ARTICLE_POOL_FILL_SIZE: int = 5  # articles to pre-fetch per refill batch
 LISTENING_POOL_THRESHOLD: int = 2  # refill when pool drops below this
 LISTENING_POOL_FILL_SIZE: int = 3  # lessons to pre-fetch per refill batch
 
+WRITING_THEME_CHOOSE_COUNT: int = 5  # themes shown in the full picker list
+
+# RSS sources per language for article fetching.
+# Intentionally topic-diverse: science, culture, health, sport, and some general news.
+# Hard-news-only feeds are limited to 2 per language so war/politics don't dominate.
+LANG_RSS_SOURCES: dict[str, list[str]] = {
+    "de": [
+        "https://www.heise.de/rss/heise-top-atom.xml",  # tech
+        "https://www.golem.de/rss.php",  # tech
+        "https://www.spektrum.de/alias/rss/spektrum-de-rss-feed/996406",  # science
+        "https://www.zeit.de/kultur/index.xml",  # culture
+        "https://www.sueddeutsche.de/rss/kultur",  # culture
+        "https://www.apotheken-umschau.de/feeds/rss/ratgeber",  # health
+        "https://www.nationalgeographic.de/feed",  # nature
+        "https://www.kicker.de/news/rss/info.xml",  # sport
+        "https://www.tagesschau.de/xml/rss2/",  # general news
+        "https://rss.dw.com/rdf/rss-de-news",  # general news
+    ],
+    "en": [
+        "https://feeds.feedburner.com/TechCrunch",  # tech
+        "https://www.sciencedaily.com/rss/all.xml",  # science
+        "https://www.newscientist.com/feed/home/",  # science
+        "https://www.theguardian.com/uk/culture/rss",  # culture
+        "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml",  # culture
+        "https://www.health.harvard.edu/blog/feed",  # health
+        "https://www.theguardian.com/environment/rss",  # environment
+        "https://feeds.bbci.co.uk/sport/rss.xml",  # sport
+        "https://feeds.bbci.co.uk/news/rss.xml",  # general news
+        "https://rss.reuters.com/reuters/topNews",  # general news
+    ],
+    "es": [
+        "https://www.bbc.com/mundo/ciencia_y_tecnologia/index.xml",  # science/tech
+        "https://www.nationalgeographic.es/feed",  # nature
+        "https://www.bbc.com/mundo/index.xml",  # general
+        "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada",  # general
+    ],
+    "fr": [
+        "https://www.france24.com/fr/sciences-et-techno/rss",  # science/tech
+        "https://www.lemonde.fr/culture/rss_full.xml",  # culture
+        "https://www.france24.com/fr/rss",  # general
+        "https://www.lemonde.fr/rss/une.xml",  # general
+    ],
+    "it": [
+        "https://www.ansa.it/sito/notizie/tecnologia/tecnologia_rss.xml",  # tech
+        "https://www.ansa.it/sito/notizie/topnews/topnews_rss.xml",  # general
+    ],
+    "pt": [
+        "https://g1.globo.com/rss/g1/ciencia-e-saude/",  # science/health
+        "https://g1.globo.com/rss/g1/",  # general
+    ],
+}
+
 # Articles stripped during case-insensitive duplicate word matching.
 # Covers German (der/die/das), French (le/la/un/une), Spanish (los/las), English (the).
 STRIP_ARTICLES: tuple[str, ...] = (

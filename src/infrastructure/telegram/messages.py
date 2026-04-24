@@ -269,7 +269,7 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "/session — Start a reading lesson\n"
         "/listen — Start a listening lesson from a podcast\n"
         f"/vocab — Vocabulary cards ({vocab_card_count} words, topic rotates)\n"
-        "/repeat — Review previously seen words (oldest first, no cards created)\n"
+        # "/repeat — Review previously seen words (oldest first, no cards created)\n" #TODO: fix?
         "/clearvocab — Clear vocab pool (use after changing level or to force fresh words)\n"
         "/settings — Update your profile (language, level, goal, card count)\n"
         "/newdeck &lt;name&gt; — Create a new deck in Anki/Mochi and set it as active\n"
@@ -284,7 +284,7 @@ def help_text(vocab_card_count: int = DEFAULT_VOCAB_CARD_COUNT) -> str:
         "4. Optional writing exercise:\n"
         "   ✍️ Sentences — 2–3 sentences with article words\n"
         "   📝 Grammar — practice a grammar structure\n"
-        "   📰 Essay — 200+ word formal text (exam prep)\n"
+        "   📰 Essay — N+ word formal text (exam prep)\n"
         "5. Writing feedback + flashcards from your mistakes\n\n"
         "🎧 How a listening lesson works:\n"
         "1. Bot finds a podcast episode in your target language\n"
@@ -316,18 +316,7 @@ def bug_report_unsupported_file() -> str:
 
 
 def unknown_message() -> str:
-    return (
-        "I didn't understand that.\n\n"
-        "Available commands:\n"
-        "/session — reading lesson\n"
-        "/listen — listening lesson\n"
-        "/vocab — vocabulary cards\n"
-        "/repeat — review past words\n"
-        "/settings — preferences\n"
-        "/bug — report a bug\n"
-        "/exit — cancel active session\n"
-        "/help — full help"
-    )
+    return "❓ I didn't understand that.\n\nPlease see /help command"
 
 
 def session_cancelled() -> str:

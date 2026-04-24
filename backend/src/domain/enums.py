@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import Enum, StrEnum
 
 
 class Level(StrEnum):
@@ -110,6 +110,11 @@ class ActivityType(StrEnum):
 class Platform(StrEnum):
     TELEGRAM = "telegram"
     WEB = "web"
+
+
+class CardBackend(Enum):
+    MOCHI = "mochi"
+    ANKI = "anki"
 
 
 # Deprecated alias — remove after all references updated

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from backend.src.application.agent.core import CardBackend, LessonAgent
+from backend.src.application.agent.core import LessonAgent
 from backend.src.application.article_refill_service import ArticleRefillService
 from backend.src.application.listening_refill_service import ListeningRefillService
 from backend.src.application.listening_service import ListeningAgent
@@ -20,11 +20,14 @@ from backend.src.application.use_cases.vocab_use_case import (
     CaptureWordUseCase,
     GenerateVocabUseCase,
 )
+from backend.src.application.use_cases.writing_use_case import WritingUseCase
 from backend.src.application.vocab_refill_service import VocabRefillService
 from backend.src.config import BackendSettings
+from backend.src.domain.enums import CardBackend
 from backend.src.domain.ports.listening_history_repo import IListeningHistoryRepository
 from backend.src.domain.ports.listening_pool_repo import IListeningPoolRepository
 from backend.src.domain.ports.session_history_repo import ISessionHistoryRepository
+from backend.src.domain.ports.writing_theme_repo import IWritingThemeRepository
 from backend.src.infrastructure.audio import AudioService
 from backend.src.infrastructure.card_backends.anki import AnkiClient
 from backend.src.infrastructure.card_backends.mochi import MochiClient
@@ -37,6 +40,7 @@ from backend.src.infrastructure.database.repositories import (
     SessionHistoryRepository,
     SessionRepository,
     VocabPoolRepository,
+    WritingThemeRepository,
 )
 from backend.src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter
 from backend.src.infrastructure.fetchers.rss import NewsArticleFetcher
@@ -89,11 +93,11 @@ class AppProvider(Provider):
     def vocab_pool_repo(self, session: AsyncSession) -> VocabPoolRepository:
         return VocabPoolRepository(session)
 
-    @provide(scope=Scope.REQUEST, provides=ISessionHistoryRepository)
-    def session_history_repo(self, session: AsyncSession) -> SessionHistoryRepository:
+    @provide(scope=Scope.REQUEST)
+    def session_history_repo(self, session: AsyncSession) -> ISessionHistoryRepository:
         return SessionHistoryRepository(session)
 
-    @provide(scope=Scope.APP, provides=LLMClient)
+    @provide(scope=Scope.APP)
     def llm(self, settings: BackendSettings) -> LLMClient:
         return LLMClient(
             base_url=settings.LLM_BASE_URL,
@@ -101,7 +105,7 @@ class AppProvider(Provider):
             model=settings.LLM_MODEL,
         )
 
-    @provide(scope=Scope.APP, provides=NewsArticleFetcher)
+    @provide(scope=Scope.APP)
     def article_fetcher(self) -> NewsArticleFetcher:
         return NewsArticleFetcher()
 
@@ -181,12 +185,12 @@ class AppProvider(Provider):
     ) -> ArticleRefillService:
         return ArticleRefillService(agent=agent, repo=repo)
 
-    @provide(scope=Scope.REQUEST, provides=IListeningPoolRepository)
-    def listening_pool_repo(self, session: AsyncSession) -> ListeningPoolRepository:
+    @provide(scope=Scope.REQUEST)
+    def listening_pool_repo(self, session: AsyncSession) -> IListeningPoolRepository:
         return ListeningPoolRepository(session)
 
-    @provide(scope=Scope.REQUEST, provides=IListeningHistoryRepository)
-    def listening_history_repo(self, session: AsyncSession) -> ListeningHistoryRepository:
+    @provide(scope=Scope.REQUEST)
+    def listening_history_repo(self, session: AsyncSession) -> IListeningHistoryRepository:
         return ListeningHistoryRepository(session)
 
     @provide(scope=Scope.REQUEST)
@@ -267,6 +271,19 @@ class AppProvider(Provider):
         repo: VocabPoolRepository,
     ) -> CaptureWordUseCase:
         return CaptureWordUseCase(agent=agent, repo=repo)
+
+    @provide(scope=Scope.REQUEST)
+    def writing_theme_repo(self, session: AsyncSession) -> IWritingThemeRepository:
+        return WritingThemeRepository(session)
+
+    @provide(scope=Scope.REQUEST)
+    def writing_uc(
+        self,
+        agent: LessonAgent,
+        store: RedisSessionStore,
+        theme_repo: IWritingThemeRepository,
+    ) -> WritingUseCase:
+        return WritingUseCase(agent=agent, store=store, theme_repo=theme_repo)
 
 
 def create_container():

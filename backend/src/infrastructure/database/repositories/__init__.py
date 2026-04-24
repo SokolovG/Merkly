@@ -12,6 +12,9 @@ from backend.src.infrastructure.database.repositories.session_history_repo impor
 )
 from backend.src.infrastructure.database.repositories.session_repo import SessionRepository
 from backend.src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
+from backend.src.infrastructure.database.repositories.writing_theme_repo import (
+    WritingThemeRepository,
+)
 
 __all__ = [
     "ArticlePoolRepository",
@@ -22,4 +25,5 @@ __all__ = [
     "SessionHistoryRepository",
     "SessionRepository",
     "VocabPoolRepository",
+    "WritingThemeRepository",
 ]
