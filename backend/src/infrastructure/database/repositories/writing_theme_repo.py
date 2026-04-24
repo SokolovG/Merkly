@@ -88,6 +88,26 @@ class WritingThemeRepository(IWritingThemeRepository):
             id=row.id, theme=row.theme, target_lang=row.target_lang, level=row.level
         )
 
+    async def count_unseen(self, user_id: uuid.UUID, target_lang: str, level: str | None) -> int:
+        seen_ids_subq = select(WritingThemeHistoryModel.theme_id).where(
+            WritingThemeHistoryModel.user_id == user_id
+        )
+        level_filter = (
+            (WritingThemePoolModel.level == level) | (WritingThemePoolModel.level.is_(None))
+            if level
+            else WritingThemePoolModel.level.is_(None)
+        )
+        result = await self._db.execute(
+            select(func.count())
+            .select_from(WritingThemePoolModel)
+            .where(
+                WritingThemePoolModel.target_lang == target_lang,
+                level_filter,
+                WritingThemePoolModel.id.not_in(seen_ids_subq),
+            )
+        )
+        return result.scalar_one()
+
     async def mark_seen(self, user_id: uuid.UUID, theme_id: uuid.UUID) -> None:
         stmt = (
             insert(WritingThemeHistoryModel)

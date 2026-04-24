@@ -4,7 +4,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from src.infrastructure.database.models import (
+from backend.src.infrastructure.database.models import (
     Base,
     ProfileModel,  # noqa
     SessionModel,  # noqa
@@ -16,6 +16,8 @@ from src.infrastructure.database.models import (
     VocabPoolModel,  # noqa
     ListeningHistoryModel,  # noqa
     IdentityModel,  # noqa
+    WritingThemePoolModel,  # noqa
+    WritingThemeHistoryModel,  # noqa
 )
 
 

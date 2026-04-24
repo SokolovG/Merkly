@@ -195,13 +195,24 @@ class LessonAgent:
         ]
         response = await self._llm.complete(messages, tools=[])
         raw = (response.content or "").strip()
+
+        # Strip markdown code fences (```json ... ``` or ``` ... ```)
+        if raw.startswith("```"):
+            lines = raw.split("\n")
+            # Drop first line (```json or ```) and last line (```)
+            raw = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+
         try:
             themes: list[str] = json.loads(raw)
             return [str(t) for t in themes[:count]]
         except (json.JSONDecodeError, TypeError):
             # LLM didn't return valid JSON — extract lines as fallback
-            lines = [ln.strip().strip('"').strip("'").strip("-").strip() for ln in raw.splitlines()]
-            return [ln for ln in lines if ln][:count]
+            lines = [
+                ln.strip().strip('",').strip("'").strip("-").strip() for ln in raw.splitlines()
+            ]
+            return [ln for ln in lines if ln and not ln.startswith("[") and not ln.startswith("]")][
+                :count
+            ]
 
     async def generate_standalone_writing_task(
         self,

@@ -1,9 +1,9 @@
 import asyncio
 import functools
 from collections.abc import Callable, Coroutine
-from typing import Any
+from typing import Any, TypeVar
 
-from aiogram.client.bot import T
+T = TypeVar("T")
 
 
 def retry(

@@ -30,6 +30,11 @@ class IWritingThemeRepository(ABC):
     async def get_by_id(self, theme_id: UUID) -> WritingTheme | None: ...
 
     @abstractmethod
+    async def count_unseen(self, user_id: UUID, target_lang: str, level: str | None) -> int:
+        """Return number of themes not yet seen by this user for the given lang/level."""
+        ...
+
+    @abstractmethod
     async def seed(self, themes: list[WritingTheme]) -> None:
         """Insert themes that do not already exist (idempotent upsert by text+lang)."""
         ...

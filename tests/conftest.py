@@ -5,7 +5,7 @@ import os
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
-from src.infrastructure.database.models import (  # noqa: F401 — ensure tables registered
+from backend.src.infrastructure.database.models import (  # noqa: F401 — ensure tables registered
     ArticlePoolModel,
     Base,
     ListeningHistoryModel,

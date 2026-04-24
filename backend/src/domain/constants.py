@@ -165,6 +165,8 @@ LISTENING_POOL_THRESHOLD: int = 2  # refill when pool drops below this
 LISTENING_POOL_FILL_SIZE: int = 3  # lessons to pre-fetch per refill batch
 
 WRITING_THEME_CHOOSE_COUNT: int = 5  # themes shown in the full picker list
+WRITING_THEME_POOL_THRESHOLD: int = 8  # refill when unseen count drops below this
+WRITING_THEME_FILL_SIZE: int = 15  # themes to generate per refill batch
 
 # RSS sources per language for article fetching.
 # Intentionally topic-diverse: science, culture, health, sport, and some general news.

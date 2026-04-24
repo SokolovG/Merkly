@@ -1,21 +1,18 @@
-"""Writing use case — standalone theme-based writing sessions.
-
-Two flows share one use case:
-- Standalone (/writing command): user picks an exam-style theme from the DB pool
-  → WritingUseCase.get_themes + WritingUseCase.start
-- Session-backed (post-reading/listening writing): article text is already in
-  the Redis session; the controller calls agent.generate_writing_task directly.
-  That path stays thin and does not need a separate use case.
-"""
-
+import asyncio
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 
+import structlog
+
 from backend.src.application.agent.core import LessonAgent
+from backend.src.domain.constants import WRITING_THEME_FILL_SIZE, WRITING_THEME_POOL_THRESHOLD
 from backend.src.domain.entities import Identity, UserProfile, WritingTheme
 from backend.src.domain.ports.writing_theme_repo import IWritingThemeRepository
 from backend.src.infrastructure.exceptions import InternalServerError, NotFoundError
 from backend.src.infrastructure.session_store import RedisSessionStore
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -46,19 +43,75 @@ class WritingUseCase:
         Default limit=1 for the random-theme flow (/writing command).
         Pass limit=5 for the choose-theme picker flow.
         Resets history automatically when pool is exhausted.
+        On pool-miss (table empty), generates themes via LLM and seeds the pool.
         """
         try:
-            return await self._theme_repo.get_unseen(
+            themes = await self._theme_repo.get_unseen(
                 user_id=profile.id,
                 target_lang=str(profile.target_lang),
                 level=profile.level,
                 limit=limit,
             )
+            if themes:
+                asyncio.create_task(
+                    self._refill_if_needed(profile),
+                    name=f"writing_theme_refill_{profile.id}",
+                )
+                return themes
+
+            # Pool empty — generate via LLM synchronously, seed, then return
+            new_themes = await self._generate_and_seed(
+                profile, count=max(limit, WRITING_THEME_FILL_SIZE)
+            )
+            return new_themes[:limit]
+        except InternalServerError:
+            raise
         except Exception as exc:
             raise InternalServerError(
                 message="Failed to fetch writing themes",
                 details={"user_id": str(profile.id)},
             ) from exc
+
+    async def _refill_if_needed(self, profile: UserProfile) -> None:
+        """Background task: seed more themes if unseen count is below threshold."""
+        try:
+            unseen = await self._theme_repo.count_unseen(
+                user_id=profile.id,
+                target_lang=str(profile.target_lang),
+                level=profile.level,
+            )
+            if unseen >= WRITING_THEME_POOL_THRESHOLD:
+                return
+            logger.info(
+                "writing_theme_pool_refill",
+                user_id=str(profile.id),
+                unseen=unseen,
+                threshold=WRITING_THEME_POOL_THRESHOLD,
+            )
+            await self._generate_and_seed(profile, count=WRITING_THEME_FILL_SIZE)
+        except Exception as exc:
+            logger.warning("writing_theme_refill_error", user_id=str(profile.id), error=str(exc))
+
+    async def _generate_and_seed(self, profile: UserProfile, count: int) -> list[WritingTheme]:
+        raw = await self._agent.generate_writing_themes(
+            target_lang=str(profile.target_lang),
+            native_lang=str(profile.native_lang),
+            level=profile.level,
+            count=count,
+        )
+        themes = [
+            WritingTheme(
+                id=uuid.uuid4(),
+                theme=t,
+                target_lang=str(profile.target_lang),
+                level=profile.level,
+            )
+            for t in raw
+            if t.strip()
+        ]
+        if themes:
+            await self._theme_repo.seed(themes)
+        return themes
 
     async def start(
         self,
@@ -90,10 +143,8 @@ class WritingUseCase:
                 details={"user_id": str(profile.id), "theme": theme_obj.theme},
             ) from exc
 
-        try:
+        with suppress(Exception):
             await self._theme_repo.mark_seen(user_id=profile.id, theme_id=theme_id)
-        except Exception:
-            pass  # non-critical — don't fail the session over history tracking
 
         session_id = str(uuid.uuid4())
         session: dict = {

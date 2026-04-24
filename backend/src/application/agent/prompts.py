@@ -389,14 +389,21 @@ def build_standalone_writing_task_prompt(
 
     if mode == "article":
         return (
-            f"Create a structured writing task for a {level} {name} student on this topic:\n\n"
-            f'"{theme}"\n\n'
-            f"The task should:\n"
-            f"- Require a text of 200-250 words\n"
-            f"- Specify the text type (Erörterung, Stellungnahme, Kommentar, or Bericht)\n"
-            f"- List 2-3 specific points the student must address\n"
-            f"- Resemble an exam writing prompt (e.g. telc B2, Goethe, EPD format)\n\n"
-            f"Reply ONLY with the task instructions in {name}, nothing else."
+            f"Create a realistic exam-style writing task for a {level} {name} student "
+            f'on this topic: "{theme}"\n\n'
+            f"Structure it exactly like a language exam (telc, Goethe, ÖSD, DELF, DELE, etc.):\n\n"
+            f"1. A short framing sentence in {name} telling the student they read/heard something "
+            f"about the topic (1 sentence).\n"
+            f"2. A brief stimulus text in {name} — a realistic excerpt (5-8 sentences) from a "
+            f"news article, blog post, or study about this topic. Include a plausible source "
+            f"name in parentheses.\n"
+            f"3. The writing instruction in {name}: specify text type "
+            f"(Stellungnahme / Erörterung / Kommentar / Bericht / Brief), word count "
+            f"(190-220 words), and that they should include personal experience and examples.\n"
+            f"4. Three Leitfragen (guiding questions) in {name} numbered 1-3 that the student "
+            f"must address. Make them specific to the stimulus text.\n\n"
+            f"Reply ONLY with the full task in {name}. No meta-commentary, no labels like "
+            f"'stimulus text:', just the natural exam task flow."
         )
 
     if mode == "grammar":

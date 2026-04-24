@@ -1,11 +1,17 @@
+import asyncio
 import uuid
 from dataclasses import dataclass
 
+import structlog
+
 from backend.src.application.agent.core import LessonAgent
+from backend.src.application.vocab_refill_service import VocabRefillService
 from backend.src.domain.constants import STRIP_ARTICLES
 from backend.src.domain.entities import PooledVocabCard, UserProfile, VocabCard
 from backend.src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from backend.src.infrastructure.exceptions import InternalServerError
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,10 @@ class GenerateVocabUseCase:
 
             if pool_cards:
                 await self._repo.mark_shown(profile.id, [c.id for c in pool_cards])
+                asyncio.create_task(
+                    VocabRefillService(self._agent, self._repo).refill_if_needed(profile),
+                    name=f"vocab_refill_{profile.id}",
+                )
                 return VocabResult(topic="Vocabulary", cards=pool_cards, from_pool=True)
 
             actual_topic, vocab_cards = await self._agent.topic_vocab_lesson(
