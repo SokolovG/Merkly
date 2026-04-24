@@ -1,3 +1,5 @@
+from typing import cast
+
 from dishka.integrations.litestar import FromDishka, inject
 from litestar import Controller, get, post
 from litestar.exceptions import NotFoundException
@@ -8,6 +10,7 @@ from backend.src.application.use_cases.vocab_use_case import (
     CaptureWordUseCase,
     GenerateVocabUseCase,
 )
+from backend.src.domain.entities import PooledVocabCard, VocabCard
 from backend.src.domain.enums import Platform
 from backend.src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from backend.src.presentation.converters import pooled_card_to_dto, vocab_card_to_dto
@@ -41,9 +44,9 @@ class VocabController(Controller):
         result = await generate_uc.execute(ctx.profile, data.count, data.force_topic)
 
         cards = (
-            [pooled_card_to_dto(c) for c in result.cards]  # type: ignore[arg-type]
+            [pooled_card_to_dto(c) for c in cast(list[PooledVocabCard], result.cards)]
             if result.from_pool
-            else [vocab_card_to_dto(c) for c in result.cards]  # type: ignore[arg-type]
+            else [vocab_card_to_dto(c) for c in cast(list[VocabCard], result.cards)]
         )
         return SuccessResponse(
             data=VocabResponse(topic=result.topic, cards=cards),
