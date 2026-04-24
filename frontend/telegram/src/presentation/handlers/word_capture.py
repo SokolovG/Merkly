@@ -16,7 +16,8 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.infrastructure.backend_client import BackendClient, CaptureWordResponse
 from src.presentation import messages
-from src.presentation.handlers.common import PLATFORM, CallbackAction, contact_id as get_contact_id
+from src.presentation.handlers.common import PLATFORM, CallbackAction
+from src.presentation.handlers.common import contact_id as get_contact_id
 
 router = Router()
 logger = structlog.get_logger(__name__)
@@ -35,7 +36,6 @@ def _word_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
-                InlineKeyboardButton(text="✅ Looks good", callback_data=CallbackAction.WORD_OK),
                 InlineKeyboardButton(
                     text="🔄 Wrong meaning?", callback_data=CallbackAction.WORD_REGEN
                 ),
@@ -108,14 +108,6 @@ async def cmd_capture_word(
     await state.update_data(regen_word=word)
 
     await message.answer(_format_card(result), parse_mode="HTML", reply_markup=_word_keyboard())
-
-
-@router.callback_query(F.data == CallbackAction.WORD_OK)
-async def handle_word_ok(callback: CallbackQuery, state: FSMContext) -> None:
-    await state.clear()
-    if isinstance(callback.message, Message):
-        await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.answer("✅ Saved!")
 
 
 @router.callback_query(F.data == CallbackAction.WORD_REGEN)

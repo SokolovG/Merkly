@@ -17,7 +17,6 @@ class CallbackAction(StrEnum):
     LESSON = "lesson"
     DELETE_CARD = "delcard"
     WRITING = "writing"
-    WORD_OK = "word_ok"
     WORD_REGEN = "word_regen"
     NEXT_READING = "nread"
     NEXT_LISTENING = "nlisten"
