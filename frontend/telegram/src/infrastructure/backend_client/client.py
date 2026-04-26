@@ -211,15 +211,19 @@ class BackendClient:
         contact_id: str,
         word: str,
         context: str,
+        old_card_id: str | None = None,
     ) -> CaptureWordResponse:
+        body: dict[str, Any] = {
+            "platform": platform,
+            "contact_id": contact_id,
+            "word": word,
+            "context": context,
+        }
+        if old_card_id:
+            body["old_card_id"] = old_card_id
         response = await self._client.post(
             "/api/vocab/word/regenerate",
-            json={
-                "platform": platform,
-                "contact_id": contact_id,
-                "word": word,
-                "context": context,
-            },
+            json=body,
             headers=self._headers(),
         )
         response.raise_for_status()

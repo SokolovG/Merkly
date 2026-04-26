@@ -28,3 +28,4 @@ class RegenerateWordRequest(msgspec.Struct):
     contact_id: str
     word: str
     context: str  # Required for regeneration
+    old_card_id: str | None = None  # Backend ID of the card to replace

@@ -1,13 +1,13 @@
-import asyncio
 import uuid
 from dataclasses import dataclass
 
 import structlog
 
 from backend.src.application.agent.core import LessonAgent
-from backend.src.application.vocab_refill_service import VocabRefillService
+from backend.src.application.background_refiller import BackgroundRefiller
 from backend.src.domain.constants import STRIP_ARTICLES
 from backend.src.domain.entities import PooledVocabCard, UserProfile, VocabCard
+from backend.src.domain.ports.card_gateway import ICardGateway
 from backend.src.infrastructure.database.repositories.vocab_pool_repo import VocabPoolRepository
 from backend.src.infrastructure.exceptions import InternalServerError
 
@@ -38,9 +38,12 @@ def _normalize_word(word: str) -> str:
 
 
 class GenerateVocabUseCase:
-    def __init__(self, agent: LessonAgent, repo: VocabPoolRepository) -> None:
+    def __init__(
+        self, agent: LessonAgent, repo: VocabPoolRepository, refiller: BackgroundRefiller
+    ) -> None:
         self._agent = agent
         self._repo = repo
+        self._refiller = refiller
 
     async def execute(
         self,
@@ -56,10 +59,7 @@ class GenerateVocabUseCase:
 
             if pool_cards:
                 await self._repo.mark_shown(profile.id, [c.id for c in pool_cards])
-                asyncio.create_task(
-                    VocabRefillService(self._agent, self._repo).refill_if_needed(profile),
-                    name=f"vocab_refill_{profile.id}",
-                )
+                self._refiller.schedule_vocab_refill(profile)
                 return VocabResult(topic="Vocabulary", cards=pool_cards, from_pool=True)
 
             actual_topic, vocab_cards = await self._agent.topic_vocab_lesson(
@@ -80,9 +80,12 @@ class GenerateVocabUseCase:
 
 
 class CaptureWordUseCase:
-    def __init__(self, agent: LessonAgent, repo: VocabPoolRepository) -> None:
+    def __init__(
+        self, agent: LessonAgent, repo: VocabPoolRepository, card_gateway: ICardGateway
+    ) -> None:
         self._agent = agent
         self._repo = repo
+        self._card_gateway = card_gateway
 
     async def execute(
         self,
@@ -113,9 +116,16 @@ class CaptureWordUseCase:
         profile: UserProfile,
         word: str,
         context: str,
+        old_card_id: str | None = None,
     ) -> WordCaptureResult:
-        """Bypass duplicate check — user explicitly requested regeneration with new context."""
+        """Bypass duplicate check — user explicitly requested regeneration with new context.
+
+        Deletes old_card_id from the card backend before creating the replacement so the
+        user ends up with exactly one card (T36 fix).
+        """
         try:
+            if old_card_id:
+                await self._card_gateway.delete_card(old_card_id)
             return await self._call_llm(profile, word, context)
         except InternalServerError:
             raise

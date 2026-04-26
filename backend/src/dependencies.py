@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import (
 
 from backend.src.application.agent.core import LessonAgent
 from backend.src.application.article_refill_service import ArticleRefillService
+from backend.src.application.background_refiller import BackgroundRefiller
 from backend.src.application.listening_refill_service import ListeningRefillService
 from backend.src.application.listening_service import ListeningAgent
 from backend.src.application.ports.storage import Storage
@@ -165,6 +166,19 @@ class AppProvider(Provider):
     ) -> ListeningAgent:
         return ListeningAgent(podcast_fetcher, audio, whisper, llm)
 
+    @provide(scope=Scope.APP)
+    def background_refiller(
+        self,
+        session_maker: async_sessionmaker[AsyncSession],
+        agent: LessonAgent,
+        listening_agent: ListeningAgent,
+    ) -> BackgroundRefiller:
+        return BackgroundRefiller(
+            session_maker=session_maker,
+            agent=agent,
+            listening_agent=listening_agent,
+        )
+
     @provide(scope=Scope.REQUEST)
     def vocab_refill_service(
         self,
@@ -246,6 +260,7 @@ class AppProvider(Provider):
         store: RedisSessionStore,
         listening_pool: IListeningPoolRepository,
         listening_agent: ListeningAgent,
+        refiller: BackgroundRefiller,
     ) -> StartSessionUseCase:
         return StartSessionUseCase(
             article_pool=article_pool,
@@ -254,6 +269,7 @@ class AppProvider(Provider):
             store=store,
             listening_pool=listening_pool,
             listening_agent=listening_agent,
+            refiller=refiller,
         )
 
     @provide(scope=Scope.REQUEST)
@@ -261,16 +277,18 @@ class AppProvider(Provider):
         self,
         agent: LessonAgent,
         repo: VocabPoolRepository,
+        refiller: BackgroundRefiller,
     ) -> GenerateVocabUseCase:
-        return GenerateVocabUseCase(agent=agent, repo=repo)
+        return GenerateVocabUseCase(agent=agent, repo=repo, refiller=refiller)
 
     @provide(scope=Scope.REQUEST)
     def capture_word_uc(
         self,
         agent: LessonAgent,
         repo: VocabPoolRepository,
+        card_gateway: AnkiClient | MochiClient,
     ) -> CaptureWordUseCase:
-        return CaptureWordUseCase(agent=agent, repo=repo)
+        return CaptureWordUseCase(agent=agent, repo=repo, card_gateway=card_gateway)
 
     @provide(scope=Scope.REQUEST)
     def writing_theme_repo(self, session: AsyncSession) -> IWritingThemeRepository:
@@ -282,8 +300,9 @@ class AppProvider(Provider):
         agent: LessonAgent,
         store: RedisSessionStore,
         theme_repo: IWritingThemeRepository,
+        refiller: BackgroundRefiller,
     ) -> WritingUseCase:
-        return WritingUseCase(agent=agent, store=store, theme_repo=theme_repo)
+        return WritingUseCase(agent=agent, store=store, theme_repo=theme_repo, refiller=refiller)
 
 
 def create_container():

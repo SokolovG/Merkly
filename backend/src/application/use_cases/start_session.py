@@ -1,11 +1,9 @@
-import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from backend.src.application.agent.core import LessonAgent
-from backend.src.application.article_refill_service import ArticleRefillService
-from backend.src.application.listening_refill_service import ListeningRefillService
+from backend.src.application.background_refiller import BackgroundRefiller
 from backend.src.application.listening_service import ListeningAgent
 from backend.src.domain.entities import Identity, UserProfile
 from backend.src.domain.enums import ActivityType
@@ -36,6 +34,7 @@ class StartSessionUseCase:
         store: RedisSessionStore,
         listening_pool: IListeningPoolRepository,
         listening_agent: ListeningAgent,
+        refiller: BackgroundRefiller,
     ) -> None:
         self._article_pool = article_pool
         self._session_history = session_history
@@ -43,6 +42,7 @@ class StartSessionUseCase:
         self._store = store
         self._listening_pool = listening_pool
         self._listening_agent = listening_agent
+        self._refiller = refiller
 
     def _use_listening(self, profile: UserProfile) -> bool:
         return (
@@ -59,10 +59,7 @@ class StartSessionUseCase:
         pool_article = await self._article_pool.get_oldest(profile.id, str(profile.target_lang))
         if pool_article is not None:
             await self._article_pool.mark_served(pool_article.id)
-            asyncio.create_task(
-                ArticleRefillService(self._agent, self._article_pool).refill_if_needed(profile),
-                name=f"article_refill_{profile.id}",
-            )
+            self._refiller.schedule_article_refill(profile)
             title, url, text, questions = (
                 pool_article.title,
                 pool_article.url,
@@ -108,12 +105,7 @@ class StartSessionUseCase:
         pool_lesson = await self._listening_pool.get_oldest(profile.id, str(profile.target_lang))
         if pool_lesson is not None:
             await self._listening_pool.mark_served(pool_lesson.id)
-            asyncio.create_task(
-                ListeningRefillService(
-                    self._listening_agent, self._listening_pool
-                ).refill_if_needed(profile),
-                name=f"listening_refill_{profile.id}",
-            )
+            self._refiller.schedule_listening_refill(profile)
             title = pool_lesson.title
             episode_url = pool_lesson.episode_url
             questions = list(pool_lesson.questions)

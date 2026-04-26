@@ -131,7 +131,9 @@ class VocabController(Controller):
     ) -> SuccessResponse:
         """Re-run word capture with explicit context, bypassing duplicate check."""
         ctx = await resolver.resolve(data.platform, data.contact_id)
-        result = await capture_uc.execute_regen(ctx.profile, data.word, data.context)
+        result = await capture_uc.execute_regen(
+            ctx.profile, data.word, data.context, data.old_card_id
+        )
         assert result.card is not None
         return SuccessResponse(
             data=CaptureWordResponse(

@@ -104,8 +104,8 @@ async def cmd_capture_word(
         await message.answer(messages.word_already_exists(word), parse_mode="HTML")
         return
 
-    # Store word in FSMContext for potential regen (word string only, not full card)
-    await state.update_data(regen_word=word)
+    # Store word + card ID for potential regen — old card deleted on regeneration
+    await state.update_data(regen_word=word, regen_card_id=result.pool_card_id)
 
     await message.answer(_format_card(result), parse_mode="HTML", reply_markup=_word_keyboard())
 
@@ -130,6 +130,7 @@ async def handle_regen_context(
 ) -> None:
     data = await state.get_data()
     word = data.get("regen_word", "")
+    old_card_id: str | None = data.get("regen_card_id") or None
     context = message.text or ""
     cid = get_contact_id(message)
 
@@ -141,7 +142,7 @@ async def handle_regen_context(
 
     logger.info("cmd_regen_word", word=word)
     try:
-        result = await backend.regenerate_word(PLATFORM, cid, word, context)
+        result = await backend.regenerate_word(PLATFORM, cid, word, context, old_card_id)
     except Exception as e:
         await message.answer(f"❌ Couldn't regenerate card: {e}")
         return

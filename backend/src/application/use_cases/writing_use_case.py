@@ -1,4 +1,3 @@
-import asyncio
 import uuid
 from contextlib import suppress
 from dataclasses import dataclass
@@ -6,7 +5,8 @@ from dataclasses import dataclass
 import structlog
 
 from backend.src.application.agent.core import LessonAgent
-from backend.src.domain.constants import WRITING_THEME_FILL_SIZE, WRITING_THEME_POOL_THRESHOLD
+from backend.src.application.background_refiller import BackgroundRefiller
+from backend.src.domain.constants import WRITING_THEME_FILL_SIZE
 from backend.src.domain.entities import Identity, UserProfile, WritingTheme
 from backend.src.domain.ports.writing_theme_repo import IWritingThemeRepository
 from backend.src.infrastructure.exceptions import InternalServerError, NotFoundError
@@ -28,10 +28,12 @@ class WritingUseCase:
         agent: LessonAgent,
         store: RedisSessionStore,
         theme_repo: IWritingThemeRepository,
+        refiller: BackgroundRefiller,
     ) -> None:
         self._agent = agent
         self._store = store
         self._theme_repo = theme_repo
+        self._refiller = refiller
 
     async def get_themes(
         self,
@@ -53,10 +55,7 @@ class WritingUseCase:
                 limit=limit,
             )
             if themes:
-                asyncio.create_task(
-                    self._refill_if_needed(profile),
-                    name=f"writing_theme_refill_{profile.id}",
-                )
+                self._refiller.schedule_writing_theme_refill(profile)
                 return themes
 
             # Pool empty — generate via LLM synchronously, seed, then return
@@ -71,26 +70,6 @@ class WritingUseCase:
                 message="Failed to fetch writing themes",
                 details={"user_id": str(profile.id)},
             ) from exc
-
-    async def _refill_if_needed(self, profile: UserProfile) -> None:
-        """Background task: seed more themes if unseen count is below threshold."""
-        try:
-            unseen = await self._theme_repo.count_unseen(
-                user_id=profile.id,
-                target_lang=str(profile.target_lang),
-                level=profile.level,
-            )
-            if unseen >= WRITING_THEME_POOL_THRESHOLD:
-                return
-            logger.info(
-                "writing_theme_pool_refill",
-                user_id=str(profile.id),
-                unseen=unseen,
-                threshold=WRITING_THEME_POOL_THRESHOLD,
-            )
-            await self._generate_and_seed(profile, count=WRITING_THEME_FILL_SIZE)
-        except Exception as exc:
-            logger.warning("writing_theme_refill_error", user_id=str(profile.id), error=str(exc))
 
     async def _generate_and_seed(self, profile: UserProfile, count: int) -> list[WritingTheme]:
         raw = await self._agent.generate_writing_themes(

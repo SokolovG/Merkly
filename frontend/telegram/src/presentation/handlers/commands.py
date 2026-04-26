@@ -166,8 +166,8 @@ async def _send_session_result(target: Message, result: StartSessionResponse) ->
         )
     else:
         header = f"🎧 <b>{escape(result.title)}</b>"
-        if result.audio_url:
-            header += f"\n\n<i>Audio: {escape(result.audio_url)}</i>"
+        # if result.audio_url: #TODO
+        #     header += f"\n\n<i>Audio: {escape(result.audio_url)}</i>"
         header += "\n\n"
 
     for i, q in enumerate(result.questions, 1):
