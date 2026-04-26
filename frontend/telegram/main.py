@@ -8,8 +8,13 @@ from dishka.integrations.aiogram import setup_dishka
 
 from src.config.di import build_container
 from src.config.settings import TgSettings
-from src.presentation.handlers.commands import catch_all_router
-from src.presentation.handlers.commands import router as cmd_router
+from src.presentation.handlers import (
+    catch_all_router,
+    common_router,
+    session_router,
+    vocab_router,
+    writing_router,
+)
 from src.presentation.handlers.listening import router as listen_router
 from src.presentation.handlers.settings import router as settings_router
 from src.presentation.handlers.word_capture import router as word_router
@@ -42,11 +47,14 @@ def setup_bot(settings: TgSettings) -> tuple[Bot, Dispatcher]:
     bot = Bot(token=settings.TELEGRAM_TOKEN)
     dp = Dispatcher()
 
-    # Register routers: word_router before cmd_router (+ prefix must match before catch-all)
+    # Registration order matters: specific handlers before catch_all
     dp.include_router(word_router)
     dp.include_router(listen_router)
     dp.include_router(settings_router)
-    dp.include_router(cmd_router)
+    dp.include_router(session_router)
+    dp.include_router(vocab_router)
+    dp.include_router(writing_router)
+    dp.include_router(common_router)
     dp.include_router(catch_all_router)  # must be last
 
     container = build_container(settings)

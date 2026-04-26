@@ -10,10 +10,14 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from backend.src.application.agent.core import LessonAgent
+from backend.src.application.agent.reading_agent import ReadingAgent
+from backend.src.application.agent.vocab_agent import VocabAgent
+from backend.src.application.agent.writing_agent import WritingAgent
 from backend.src.application.article_refill_service import ArticleRefillService
 from backend.src.application.background_refiller import BackgroundRefiller
 from backend.src.application.listening_refill_service import ListeningRefillService
 from backend.src.application.listening_service import ListeningAgent
+from backend.src.application.ports.session_store import SessionStore
 from backend.src.application.ports.storage import Storage
 from backend.src.application.use_cases.resolve_user import UserResolverUseCase
 from backend.src.application.use_cases.start_session import StartSessionUseCase
@@ -25,6 +29,7 @@ from backend.src.application.use_cases.writing_use_case import WritingUseCase
 from backend.src.application.vocab_refill_service import VocabRefillService
 from backend.src.config import BackendSettings
 from backend.src.domain.enums import CardBackend
+from backend.src.domain.ports.card_gateway import ICardGateway
 from backend.src.domain.ports.listening_history_repo import IListeningHistoryRepository
 from backend.src.domain.ports.listening_pool_repo import IListeningPoolRepository
 from backend.src.domain.ports.session_history_repo import ISessionHistoryRepository
@@ -48,7 +53,7 @@ from backend.src.infrastructure.fetchers.rss import NewsArticleFetcher
 from backend.src.infrastructure.llm.client import LLMClient
 from backend.src.infrastructure.memory_storage import InMemoryStorage
 from backend.src.infrastructure.redis_storage import RedisStorage
-from backend.src.infrastructure.session_store import RedisSessionStore
+from backend.src.infrastructure.session_store import SessionStoreImpl
 from backend.src.infrastructure.whisper.client import WhisperClient
 
 
@@ -110,7 +115,7 @@ class AppProvider(Provider):
     def article_fetcher(self) -> NewsArticleFetcher:
         return NewsArticleFetcher()
 
-    @provide(scope=Scope.APP)
+    @provide(scope=Scope.APP, provides=ICardGateway)
     def card_gateway(self, settings: BackendSettings) -> AnkiClient | MochiClient:
         match CardBackend(settings.CARD_BACKEND):
             case CardBackend.ANKI:
@@ -123,11 +128,38 @@ class AppProvider(Provider):
                 )
 
     @provide(scope=Scope.APP)
+    def reading_agent(
+        self,
+        llm: LLMClient,
+        fetcher: NewsArticleFetcher,
+        card_gateway: ICardGateway,
+    ) -> ReadingAgent:
+        return ReadingAgent(llm=llm, fetcher=fetcher, card_gateway=card_gateway)
+
+    @provide(scope=Scope.APP)
+    def vocab_agent(
+        self,
+        llm: LLMClient,
+        fetcher: NewsArticleFetcher,
+        card_gateway: ICardGateway,
+    ) -> VocabAgent:
+        return VocabAgent(llm=llm, fetcher=fetcher, card_gateway=card_gateway)
+
+    @provide(scope=Scope.APP)
+    def writing_agent(
+        self,
+        llm: LLMClient,
+        fetcher: NewsArticleFetcher,
+        card_gateway: ICardGateway,
+    ) -> WritingAgent:
+        return WritingAgent(llm=llm, fetcher=fetcher, card_gateway=card_gateway)
+
+    @provide(scope=Scope.APP)
     def agent(
         self,
         llm: LLMClient,
         fetcher: NewsArticleFetcher,
-        card_gateway: AnkiClient | MochiClient,
+        card_gateway: ICardGateway,
     ) -> LessonAgent:
         return LessonAgent(llm=llm, fetcher=fetcher, card_gateway=card_gateway)
 
@@ -237,9 +269,9 @@ class AppProvider(Provider):
             return InMemoryStorage()
         return RedisStorage(redis_client)
 
-    @provide(scope=Scope.REQUEST)
-    def session_store(self, storage: Storage) -> RedisSessionStore:
-        return RedisSessionStore(storage)
+    @provide(scope=Scope.REQUEST, provides=SessionStore)
+    def session_store(self, storage: Storage) -> SessionStore:
+        return SessionStoreImpl(storage)
 
     # ── Use Cases ────────────────────────────────────────────────────────────
 
@@ -257,7 +289,7 @@ class AppProvider(Provider):
         article_pool: ArticlePoolRepository,
         session_history: ISessionHistoryRepository,
         agent: LessonAgent,
-        store: RedisSessionStore,
+        store: SessionStore,
         listening_pool: IListeningPoolRepository,
         listening_agent: ListeningAgent,
         refiller: BackgroundRefiller,
@@ -286,7 +318,7 @@ class AppProvider(Provider):
         self,
         agent: LessonAgent,
         repo: VocabPoolRepository,
-        card_gateway: AnkiClient | MochiClient,
+        card_gateway: ICardGateway,
     ) -> CaptureWordUseCase:
         return CaptureWordUseCase(agent=agent, repo=repo, card_gateway=card_gateway)
 
@@ -298,7 +330,7 @@ class AppProvider(Provider):
     def writing_uc(
         self,
         agent: LessonAgent,
-        store: RedisSessionStore,
+        store: SessionStore,
         theme_repo: IWritingThemeRepository,
         refiller: BackgroundRefiller,
     ) -> WritingUseCase:

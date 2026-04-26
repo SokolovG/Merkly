@@ -1,5 +1,4 @@
 import pytest
-
 from src.domain.ports.podcast_fetcher import IPodcastFetcher, PodcastEpisode
 from src.infrastructure.exceptions import InfrastructureError
 from src.infrastructure.fetchers.podcast.router import PodcastFetcherRouter

@@ -4,7 +4,6 @@ import uuid
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.domain.entities import Session, UserProfile, VocabCard
 from src.domain.enums import Goal, Language, WordType
 from src.infrastructure.database.repositories.profile_repo import ProfileRepository

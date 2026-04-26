@@ -1,9 +1,3 @@
-"""Listening lesson handler — thin I/O, calls BackendClient.
-
-Audio file delivery (BufferedInputFile) is deferred to 19-06 when backend
-returns a downloadable audio_url. This plan delivers title + questions.
-"""
-
 import structlog
 from aiogram import Router
 from aiogram.filters import Command
@@ -12,8 +6,8 @@ from dishka.integrations.aiogram import FromDishka
 
 from src.infrastructure.backend_client import BackendClient
 from src.presentation import messages
-from src.presentation.handlers.commands import _send_session_result
 from src.presentation.handlers.common import PLATFORM, contact_id
+from src.presentation.handlers.session import _send_session_result
 
 router = Router()
 logger = structlog.get_logger(__name__)

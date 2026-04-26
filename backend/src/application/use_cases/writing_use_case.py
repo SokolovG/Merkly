@@ -6,11 +6,12 @@ import structlog
 
 from backend.src.application.agent.core import LessonAgent
 from backend.src.application.background_refiller import BackgroundRefiller
+from backend.src.application.ports.session_store import SessionStore
 from backend.src.domain.constants import WRITING_THEME_FILL_SIZE
 from backend.src.domain.entities import Identity, UserProfile, WritingTheme
 from backend.src.domain.ports.writing_theme_repo import IWritingThemeRepository
+from backend.src.domain.session import SessionState
 from backend.src.infrastructure.exceptions import InternalServerError, NotFoundError
-from backend.src.infrastructure.session_store import RedisSessionStore
 
 logger = structlog.get_logger(__name__)
 
@@ -26,7 +27,7 @@ class WritingUseCase:
     def __init__(
         self,
         agent: LessonAgent,
-        store: RedisSessionStore,
+        store: SessionStore,
         theme_repo: IWritingThemeRepository,
         refiller: BackgroundRefiller,
     ) -> None:
@@ -126,23 +127,25 @@ class WritingUseCase:
             await self._theme_repo.mark_seen(user_id=profile.id, theme_id=theme_id)
 
         session_id = str(uuid.uuid4())
-        session: dict = {
-            "session_id": session_id,
-            "user_id": str(identity.user_id),
-            "session_type": "writing",
-            "state": "writing",
-            "theme": theme_obj.theme,
-            "writing_task_text": task,  # submit_writing reads this directly
-            "text": theme_obj.theme,  # fallback context for review_writing
-            "target_lang": str(profile.target_lang),
-            "native_lang": str(profile.native_lang),
-            "level": str(profile.level),
-            "questions": [],
-            "question_count": 0,
-            "user_answers": [],
-            "feedback": "",
-            "writing_text": "",
-            "writing_feedback": "",
-        }
+        session = SessionState(
+            session_id=session_id,
+            user_id=str(identity.user_id),
+            session_type="writing",
+            state="writing",
+            theme=theme_obj.theme,
+            writing_task_text=task,
+            text=theme_obj.theme,  # fallback context for review_writing
+            target_lang=str(profile.target_lang),
+            native_lang=str(profile.native_lang),
+            level=str(profile.level),
+            title=theme_obj.theme,
+            url="",
+            questions=[],
+            question_count=0,
+            user_answers=[],
+            feedback=None,
+            writing_text=None,
+            writing_feedback=None,
+        )
         await self._store.save(session, user_id=str(identity.user_id))
         return WritingSessionResult(session_id=session_id, task=task, theme=theme_obj.theme)

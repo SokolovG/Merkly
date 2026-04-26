@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from src.application.listening_service import AudioLesson, ListeningAgent
 from src.domain.entities import UserProfile
 from src.domain.enums import Goal, Language

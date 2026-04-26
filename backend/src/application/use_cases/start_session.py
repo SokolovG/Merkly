@@ -5,12 +5,13 @@ from datetime import UTC, datetime
 from backend.src.application.agent.core import LessonAgent
 from backend.src.application.background_refiller import BackgroundRefiller
 from backend.src.application.listening_service import ListeningAgent
+from backend.src.application.ports.session_store import SessionStore
 from backend.src.domain.entities import Identity, UserProfile
 from backend.src.domain.enums import ActivityType
 from backend.src.domain.ports.listening_pool_repo import IListeningPoolRepository
 from backend.src.domain.ports.session_history_repo import ISessionHistoryRepository
+from backend.src.domain.session import SessionState
 from backend.src.infrastructure.database.repositories.article_pool_repo import ArticlePoolRepository
-from backend.src.infrastructure.session_store import RedisSessionStore
 
 _TEXT_PREVIEW_CHARS = 2000
 
@@ -31,7 +32,7 @@ class StartSessionUseCase:
         article_pool: ArticlePoolRepository,
         session_history: ISessionHistoryRepository,
         agent: LessonAgent,
-        store: RedisSessionStore,
+        store: SessionStore,
         listening_pool: IListeningPoolRepository,
         listening_agent: ListeningAgent,
         refiller: BackgroundRefiller,
@@ -156,24 +157,24 @@ def _build_session(
     text: str,
     questions: list[str],
     audio_url: str | None = None,
-) -> dict:
-    return {
-        "session_id": session_id,
-        "user_id": user_id,
-        "session_type": session_type,
-        "state": "questions",
-        "target_lang": str(profile.target_lang),
-        "title": title,
-        "url": url,
-        "text": text[:_TEXT_PREVIEW_CHARS],
-        "questions": questions,
-        "user_answers": [],
-        "feedback": None,
-        "writing_text": None,
-        "writing_feedback": None,
-        "level": profile.level,
-        "native_lang": str(profile.native_lang),
-        "question_count": len(questions),
-        "audio_url": audio_url,
-        "created_at": datetime.now(UTC).isoformat(),
-    }
+) -> SessionState:
+    return SessionState(
+        session_id=session_id,
+        user_id=user_id,
+        session_type=session_type,
+        state="questions",
+        target_lang=str(profile.target_lang),
+        title=title,
+        url=url,
+        text=text[:_TEXT_PREVIEW_CHARS],
+        questions=questions,
+        user_answers=[],
+        feedback=None,
+        writing_text=None,
+        writing_feedback=None,
+        level=profile.level,
+        native_lang=str(profile.native_lang),
+        question_count=len(questions),
+        audio_url=audio_url,
+        created_at=datetime.now(UTC).isoformat(),
+    )

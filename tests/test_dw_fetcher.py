@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from src.infrastructure.fetchers.podcast.german.dw import DWPodcastFetcher
 
 # feedparser entries behave like dicts — use plain dicts in fixtures

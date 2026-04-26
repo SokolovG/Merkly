@@ -1,9 +1,3 @@
-"""Session controller — thin transport layer.
-
-Resolves identity, delegates to StartSessionUseCase, returns typed responses.
-All business logic lives in the use case.
-"""
-
 import uuid
 
 from dishka.integrations.litestar import FromDishka, inject
@@ -12,13 +6,13 @@ from litestar.exceptions import ClientException, NotFoundException
 from litestar.params import Parameter
 
 from backend.src.application.agent.core import LessonAgent
+from backend.src.application.ports.session_store import SessionStore
 from backend.src.application.use_cases.resolve_user import UserResolverUseCase
 from backend.src.application.use_cases.start_session import StartSessionUseCase
 from backend.src.application.use_cases.writing_use_case import WritingUseCase
 from backend.src.domain.enums import ActivityType, Platform
 from backend.src.infrastructure.database.repositories.profile_repo import ProfileRepository
 from backend.src.infrastructure.exceptions import ApiException
-from backend.src.infrastructure.session_store import RedisSessionStore
 from backend.src.presentation.converters import vocab_card_to_dto
 from backend.src.presentation.dto.session.requests import (
     StartListeningSessionRequest,
@@ -114,7 +108,7 @@ class SessionController(Controller):
     async def get_active_session(
         self,
         resolver: FromDishka[UserResolverUseCase],
-        store: FromDishka[RedisSessionStore],
+        store: FromDishka[SessionStore],
         platform: str = Parameter(query="platform"),
         contact_id: str = Parameter(query="contact_id"),
     ) -> SuccessResponse:
@@ -146,7 +140,7 @@ class SessionController(Controller):
             return _empty
 
         return SuccessResponse(
-            data=ActiveSessionResponse(session_id=sid, state=session["state"]),
+            data=ActiveSessionResponse(session_id=sid, state=session.state),
             message="Active session found",
         )
 
@@ -213,7 +207,7 @@ class SessionController(Controller):
         data: SubmitAnswerRequest,
         profile_repo: FromDishka[ProfileRepository],
         agent: FromDishka[LessonAgent],
-        store: FromDishka[RedisSessionStore],
+        store: FromDishka[SessionStore],
     ) -> SuccessResponse:
         """Run LLM review on the submitted answers and return feedback.
 
@@ -224,20 +218,20 @@ class SessionController(Controller):
         if session is None:
             raise NotFoundException(detail="Session expired or not found") from None
 
-        session["user_answers"].extend(data.answers)
-        await store.save(session, user_id=session["user_id"])
+        session.user_answers = list(session.user_answers) + list(data.answers)
+        await store.save(session, user_id=session.user_id)
 
         feedback, _ = await agent.review_answers(
-            article_text=session["text"],
-            questions=session["questions"],
-            answers=session["user_answers"],
-            level=session["level"],
-            native_lang=session["native_lang"],
-            target_lang=session["target_lang"],
+            article_text=session.text,
+            questions=session.questions,
+            answers=session.user_answers,
+            level=session.level,
+            native_lang=session.native_lang,
+            target_lang=session.target_lang,
         )
 
         try:
-            uid = uuid.UUID(session["user_id"])
+            uid = uuid.UUID(session.user_id)
             profile = await profile_repo.get_by_id(uid)
             writing_available = (
                 profile is not None and ActivityType.WRITING in profile.learning_strategy
@@ -245,9 +239,9 @@ class SessionController(Controller):
         except ValueError:
             writing_available = False
 
-        session["state"] = "writing" if writing_available else "complete"
-        session["feedback"] = feedback
-        await store.save(session, user_id=session["user_id"])
+        session.state = "writing" if writing_available else "complete"
+        session.feedback = feedback
+        await store.save(session, user_id=session.user_id)
 
         return SuccessResponse(
             data=AnswerResponse(feedback=feedback, writing_available=writing_available, cards=[]),
@@ -261,14 +255,14 @@ class SessionController(Controller):
         session_id: str,
         data: SubmitWritingRequest,
         agent: FromDishka[LessonAgent],
-        store: FromDishka[RedisSessionStore],
+        store: FromDishka[SessionStore],
     ) -> SuccessResponse:
         """Run writing review against the article context and return feedback + vocab cards."""
         session = await store.get(session_id)
         if session is None:
             raise NotFoundException(detail="Session expired or not found") from None
 
-        if session["state"] != "writing":
+        if session.state != "writing":
             raise ClientException(
                 detail="Session is not in writing state",
                 status_code=409,
@@ -276,23 +270,23 @@ class SessionController(Controller):
 
         # Standalone writing sessions pre-generate the task and store it.
         # Article-backed sessions generate it here from the article text.
-        writing_task = session.get("writing_task_text") or await agent.generate_writing_task(
-            article_text=session["text"],
-            target_lang=session["target_lang"],
-            level=session["level"],
+        writing_task = session.writing_task_text or await agent.generate_writing_task(
+            article_text=session.text,
+            target_lang=session.target_lang,
+            level=session.level,
         )
         feedback, cards = await agent.review_writing(
             writing_task=writing_task,
             user_writing=data.text,
-            level=session["level"],
-            native_lang=session["native_lang"],
-            target_lang=session["target_lang"],
+            level=session.level,
+            native_lang=session.native_lang,
+            target_lang=session.target_lang,
         )
 
-        session["state"] = "complete"
-        session["writing_text"] = data.text
-        session["writing_feedback"] = feedback
-        await store.save(session, user_id=session["user_id"])
+        session.state = "complete"
+        session.writing_text = data.text
+        session.writing_feedback = feedback
+        await store.save(session, user_id=session.user_id)
 
         return SuccessResponse(
             data=WritingResponse(

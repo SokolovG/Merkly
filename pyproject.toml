@@ -47,6 +47,7 @@ ignore = ["B008"]
 
 [tool.ty.environment]
 python-version = "3.12"
+extra-paths = ["backend"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

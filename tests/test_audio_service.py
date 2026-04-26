@@ -6,7 +6,6 @@ from unittest.mock import patch
 import httpx
 import pytest
 import respx
-
 from src.infrastructure.audio import AudioService, _validate_audio_url
 from src.infrastructure.exceptions import InfrastructureError
 

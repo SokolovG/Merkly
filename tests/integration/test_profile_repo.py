@@ -2,7 +2,6 @@
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.domain.entities import UserProfile
 from src.domain.enums import Goal, Language
 from src.infrastructure.database.repositories.profile_repo import ProfileRepository
