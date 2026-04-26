@@ -20,6 +20,7 @@ from src.infrastructure.backend_client.types import (
     RepeatVocabResponse,
     StartSessionResponse,
     StartWritingSessionResponse,
+    TranscriptResponse,
     VocabResponse,
     WritingResponse,
     WritingThemesResponse,
@@ -103,6 +104,14 @@ class BackendClient:
         raw: dict[str, Any] = msgspec.json.decode(response.content)
         return msgspec.convert(_unwrap(raw), ActiveSessionResponse)
 
+    async def cancel_active_session(self, platform: str, contact_id: str) -> None:
+        response = await self._client.delete(
+            "/api/sessions/active",
+            params={"platform": platform, "contact_id": contact_id},
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+
     async def submit_answer(self, session_id: str, answer: str) -> AnswerResponse:
         response = await self._client.post(
             f"/api/sessions/{session_id}/answer",
@@ -151,6 +160,16 @@ class BackendClient:
         response.raise_for_status()
         raw: dict[str, Any] = msgspec.json.decode(response.content)
         return msgspec.convert(_unwrap(raw), StartWritingSessionResponse)
+
+    async def get_session_transcript(self, session_id: str) -> str:
+        response = await self._client.get(
+            f"/api/sessions/{session_id}/transcript",
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        raw: dict[str, Any] = msgspec.json.decode(response.content)
+        data = msgspec.convert(_unwrap(raw), TranscriptResponse)
+        return data.text
 
     # --- Vocab ---
 

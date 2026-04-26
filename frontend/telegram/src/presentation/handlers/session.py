@@ -108,7 +108,18 @@ async def _send_session_result(target: Message, result: StartSessionResponse) ->
     for i, q in enumerate(result.questions, 1):
         header += f"<b>{i}.</b> {escape(q)}\n"
     header += f"\nSend your answers as one message (answer all {len(result.questions)})."
-    await target.answer(header, parse_mode="HTML")
+    if result.session_type == "listening":
+        show_kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text="📄 Show transcript",
+                        callback_data=f"{CallbackAction.SHOW_TRANSCRIPT}:{result.session_id}",
+                    )
+                ]
+            ]
+        )
+    await target.answer(header, parse_mode="HTML", reply_markup=show_kb if show_kb else None)
 
 
 @router.message(Command("session"))
@@ -153,25 +164,6 @@ async def cmd_reading(message: Message, backend: FromDishka[BackendClient]) -> N
         result = await backend.start_reading_session(PLATFORM, cid)
     except Exception as e:
         await message.answer(messages.lesson_failed(str(e)))
-        return
-
-    await _send_session_result(message, result)
-
-
-@router.message(Command("listen"))
-async def cmd_listen(message: Message, backend: FromDishka[BackendClient]) -> None:
-    """Start a listening session directly."""
-    structlog.contextvars.clear_contextvars()
-    cid = contact_id(message)
-    structlog.contextvars.bind_contextvars(contact_id=cid)
-    logger.info("cmd_listen")
-
-    await message.answer(messages.preparing_lesson())
-    try:
-        result = await backend.start_listening_session(PLATFORM, cid)
-    except Exception as e:
-        await message.answer(messages.lesson_failed(str(e)))
-        logger.warning(e)
         return
 
     await _send_session_result(message, result)
@@ -234,6 +226,17 @@ async def handle_answer(message: Message, backend: FromDishka[BackendClient]) ->
         feedback_msg = f"📝 <b>Feedback:</b>\n\n{escape(result.feedback)}"
 
         if result.writing_available:
+            next_btn = (
+                InlineKeyboardButton(
+                    text="🎧 Another audio",
+                    callback_data=str(CallbackAction.NEXT_LISTENING),
+                )
+                if result.session_type == "listening"
+                else InlineKeyboardButton(
+                    text="📖 Another article",
+                    callback_data=str(CallbackAction.NEXT_READING),
+                )
+            )
             writing_kb = InlineKeyboardMarkup(
                 inline_keyboard=[
                     [
@@ -250,16 +253,7 @@ async def handle_answer(message: Message, backend: FromDishka[BackendClient]) ->
                             callback_data=f"{CallbackAction.WRITING}:article",
                         ),
                     ],
-                    [
-                        InlineKeyboardButton(
-                            text="📖 Another article",
-                            callback_data=str(CallbackAction.NEXT_READING),
-                        ),
-                        InlineKeyboardButton(
-                            text="🎧 Another audio",
-                            callback_data=str(CallbackAction.NEXT_LISTENING),
-                        ),
-                    ],
+                    [next_btn],
                 ]
             )
             await message.answer(feedback_msg, parse_mode="HTML", reply_markup=writing_kb)
@@ -365,3 +359,73 @@ async def handle_next_listening(
         await callback.message.answer(messages.lesson_failed(str(e)))
         return
     await _send_session_result(callback.message, result)
+
+
+@router.callback_query(F.data.startswith(f"{CallbackAction.SHOW_TRANSCRIPT}:"))
+async def handle_show_transcript(
+    callback: CallbackQuery, backend: FromDishka[BackendClient]
+) -> None:
+    session_id = (callback.data or "").split(":", 1)[1]
+
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+
+    try:
+        transcript = await backend.get_session_transcript(session_id)
+    except Exception:
+        await callback.answer("Session expired — transcript no longer available.", show_alert=True)
+        return
+
+    transcript_msg = await callback.message.answer(
+        f"📄 <b>Transcript:</b>\n\n{escape(transcript)}", parse_mode="HTML"
+    )
+
+    hide_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="🙈 Hide transcript",
+                    callback_data=f"{CallbackAction.HIDE_TRANSCRIPT}:{session_id}:{transcript_msg.message_id}",
+                )
+            ]
+        ]
+    )
+
+    await callback.message.edit_reply_markup(reply_markup=hide_kb)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith(f"{CallbackAction.HIDE_TRANSCRIPT}:"))
+async def handle_hide_transcript(callback: CallbackQuery) -> None:
+    # callback_data format: HIDE_TRANSCRIPT:{session_id}:{transcript_message_id}
+    parts = (callback.data or "").split(":")
+    session_id = parts[1] if len(parts) > 1 else ""
+    transcript_msg_id = int(parts[2]) if len(parts) > 2 else None
+
+    if not isinstance(callback.message, Message):
+        await callback.answer()
+        return
+
+    if transcript_msg_id is not None:
+        try:
+            await callback.message.bot.delete_message(  # ty: ignore
+                chat_id=callback.message.chat.id,
+                message_id=transcript_msg_id,
+            )
+        except Exception:
+            pass  # already deleted or inaccessible
+
+    show_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="📄 Show transcript",
+                    callback_data=f"{CallbackAction.SHOW_TRANSCRIPT}:{session_id}",
+                )
+            ]
+        ]
+    )
+
+    await callback.message.edit_reply_markup(reply_markup=show_kb)
+    await callback.answer()

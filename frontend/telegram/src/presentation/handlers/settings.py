@@ -58,6 +58,8 @@ _FIELD_PROMPTS: dict[str, str] = {
     "utc_offset": "UTC offset — enter a number (e.g. <code>3</code>, <code>-5</code>):",
     "vocab_scheduler_time": "Vocab scheduler time — enter <b>HH:MM</b> (e.g. <b>09:00</b>):",
     "vocab_card_count": "Vocab cards per session — enter a number (1–20):",
+    "question_count": "Questions per session — enter a number (1–15):",
+    "episode_duration_min": "Podcast clip duration — enter minutes (1–60):",
 }
 
 _VALID_GOALS = {"travel", "work", "conversation", "general", "study"}
@@ -114,6 +116,22 @@ def _parse_value(field: str, raw: str) -> tuple[object, str | None]:
             return n, None
         except ValueError:
             return None, "Enter a number between 1 and 20."
+    if field == "question_count":
+        try:
+            n = int(value)
+            if not 1 <= n <= 15:
+                raise ValueError
+            return n, None
+        except ValueError:
+            return None, "Enter a number between 1 and 15."
+    if field == "episode_duration_min":
+        try:
+            n = int(value)
+            if not 1 <= n <= 60:
+                raise ValueError
+            return n, None
+        except ValueError:
+            return None, "Enter a number between 1 and 60."
     return None, "Unknown field."
 
 
@@ -223,14 +241,14 @@ def _session_keyboard(p: ProfileResponse) -> InlineKeyboardMarkup:
             callback_data=f"setpick:episode_duration_min:{n}",
         )
         for n in EPISODE_DURATION_OPTIONS
-    ]
+    ] + [InlineKeyboardButton(text="✏️ Custom", callback_data="set:episode_duration_min")]
     question_options = [
         InlineKeyboardButton(
-            text=f"{'✅ ' if p.question_count == n else ''}{n} questions",
+            text=f"{'✅ ' if p.question_count == n else ''}{n} q",
             callback_data=f"setpick:question_count:{n}",
         )
         for n in (2, 3, 5)
-    ]
+    ] + [InlineKeyboardButton(text="✏️ Custom", callback_data="set:question_count")]
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [

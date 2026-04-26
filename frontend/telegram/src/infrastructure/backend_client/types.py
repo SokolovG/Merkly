@@ -36,6 +36,11 @@ class AnswerResponse(msgspec.Struct):
     feedback: str
     writing_available: bool
     cards: list[CardDTO]
+    session_type: str = ""
+
+
+class TranscriptResponse(msgspec.Struct):
+    text: str
 
 
 class WritingResponse(msgspec.Struct):

@@ -35,6 +35,8 @@ class CallbackAction(StrEnum):
     WRITING_START = "wstart"  # wstart:{theme_id} — start writing with this theme
     WRITING_ANOTHER = "wanother"  # fetch another random theme, edit message in place
     WRITING_CHOOSE = "wchoose"  # expand to full theme list picker
+    SHOW_TRANSCRIPT = "transcript"  # questions msg → sends new transcript message
+    HIDE_TRANSCRIPT = "hidetranscript"  # transcript msg → collapses in place
 
 
 def contact_id(message: Message) -> str:
@@ -64,9 +66,12 @@ async def cmd_start(message: Message, backend: FromDishka[BackendClient]) -> Non
 
 
 @router.message(Command("exit"))
-async def cmd_exit(message: Message) -> None:
-    # Bot is stateless — no in-memory state to clear.
-    # Backend session TTL (15 min) handles expiry naturally.
+async def cmd_exit(message: Message, backend: FromDishka[BackendClient]) -> None:
+    cid = contact_id(message)
+    try:
+        await backend.cancel_active_session(PLATFORM, cid)
+    except Exception:
+        pass  # best-effort; session TTL is the fallback
     await message.answer(messages.session_cancelled())
 
 

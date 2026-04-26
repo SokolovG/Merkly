@@ -1,3 +1,4 @@
+import random
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -111,12 +112,14 @@ class StartSessionUseCase:
             title = pool_lesson.title
             episode_url = pool_lesson.episode_url
             questions = list(pool_lesson.questions)
+            random.shuffle(questions)
             content = pool_lesson.transcript[:_TEXT_PREVIEW_CHARS]
         else:
             lesson = await self._listening_agent.prepare_lesson(profile)
             title = lesson.title
             episode_url = lesson.episode_url
             questions = lesson.questions
+            random.shuffle(questions)
             self._refiller.schedule_listening_refill(profile)
             content = lesson.transcript[:_TEXT_PREVIEW_CHARS]
 

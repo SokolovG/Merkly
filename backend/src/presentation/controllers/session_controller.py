@@ -1,7 +1,7 @@
 import uuid
 
 from dishka.integrations.litestar import FromDishka, inject
-from litestar import Controller, get, post
+from litestar import Controller, delete, get, post
 from litestar.exceptions import ClientException, NotFoundException
 from litestar.params import Parameter
 
@@ -177,6 +177,19 @@ class SessionController(Controller):
             message="Writing themes fetched",
         )
 
+    @get("/{session_id:str}/transcript")
+    @inject
+    async def get_transcript(
+        self,
+        session_id: str,
+        store: FromDishka[SessionStore],
+    ) -> SuccessResponse:
+        """Return transcript text for a session (listening sessions only, but no type guard)."""
+        session = await store.get(session_id)
+        if session is None:
+            raise NotFoundException(detail="Session expired or not found")
+        return SuccessResponse(data={"text": session.text}, message="Transcript fetched")
+
     @post("/writing/start")
     @inject
     async def start_writing_session(
@@ -198,6 +211,36 @@ class SessionController(Controller):
             ),
             message="Writing session started",
         )
+
+    @delete("/active", status_code=200)
+    @inject
+    async def cancel_active_session(
+        self,
+        resolver: FromDishka[UserResolverUseCase],
+        store: FromDishka[SessionStore],
+        platform: str = Parameter(query="platform"),
+        contact_id: str = Parameter(query="contact_id"),
+    ) -> SuccessResponse:
+        """Cancel (delete) the user's active session immediately."""
+        try:
+            platform_enum = Platform(platform)
+        except ValueError as e:
+            raise ApiException(
+                message=f"Unknown platform: {platform!r}",
+                status_code=400,
+                error_code="VALIDATION_ERROR",
+            ) from e
+
+        try:
+            ctx = await resolver.resolve(platform_enum, contact_id)
+        except ApiException:
+            return SuccessResponse(data=None, message="No active session")
+
+        sid = await store.get_active_session_id(str(ctx.identity.user_id))
+        if sid is not None:
+            await store.delete(sid, str(ctx.identity.user_id))
+
+        return SuccessResponse(data=None, message="Session cancelled")
 
     @post("/{session_id:str}/answer")
     @inject
@@ -244,7 +287,12 @@ class SessionController(Controller):
         await store.save(session, user_id=session.user_id)
 
         return SuccessResponse(
-            data=AnswerResponse(feedback=feedback, writing_available=writing_available, cards=[]),
+            data=AnswerResponse(
+                feedback=feedback,
+                writing_available=writing_available,
+                cards=[],
+                session_type=session.session_type,
+            ),
             message="Answers reviewed",
         )
 
