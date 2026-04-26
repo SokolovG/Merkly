@@ -165,10 +165,12 @@ async def _send_session_result(target: Message, result: StartSessionResponse) ->
             f"{escape(result.content[:1500])}\n\n---\nAnswer these questions:\n\n"
         )
     else:
-        header = f"🎧 <b>{escape(result.title)}</b>"
-        # if result.audio_url: #TODO
-        #     header += f"\n\n<i>Audio: {escape(result.audio_url)}</i>"
-        header += "\n\n"
+        audio_line = (
+            f'\n\n<a href="{escape(result.audio_url)}">▶️ Listen to episode</a>'
+            if result.audio_url
+            else ""
+        )
+        header = f"🎧 <b>{escape(result.title)}</b>{audio_line}\n\n"
 
     for i, q in enumerate(result.questions, 1):
         header += f"<b>{i}.</b> {escape(q)}\n"
@@ -334,6 +336,7 @@ async def cmd_listen(message: Message, backend: FromDishka[BackendClient]) -> No
         result = await backend.start_listening_session(PLATFORM, cid)
     except Exception as e:
         await message.answer(messages.lesson_failed(str(e)))
+        logger.warning(e)
         return
 
     await _send_session_result(message, result)
@@ -422,10 +425,12 @@ async def handle_answer(message: Message, backend: FromDishka[BackendClient]) ->
     try:
         active = await backend.get_active_session(PLATFORM, cid)
     except Exception:
-        return  # backend unreachable — silently ignore
+        await message.answer(messages.unknown_message())
+        return
 
-    if active.session_id is None:
-        return  # no active session — catch_all_router will handle if needed
+    if active.session_id is None or active.state not in ("questions", "writing"):
+        await message.answer(messages.unknown_message())
+        return
 
     if active.state == "questions":
         await message.answer("🔍 Reviewing your answers…")

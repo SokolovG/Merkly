@@ -11,6 +11,7 @@ from src.config.settings import TgSettings
 from src.presentation.handlers.commands import catch_all_router
 from src.presentation.handlers.commands import router as cmd_router
 from src.presentation.handlers.listening import router as listen_router
+from src.presentation.handlers.settings import router as settings_router
 from src.presentation.handlers.word_capture import router as word_router
 
 
@@ -44,6 +45,7 @@ def setup_bot(settings: TgSettings) -> tuple[Bot, Dispatcher]:
     # Register routers: word_router before cmd_router (+ prefix must match before catch-all)
     dp.include_router(word_router)
     dp.include_router(listen_router)
+    dp.include_router(settings_router)
     dp.include_router(cmd_router)
     dp.include_router(catch_all_router)  # must be last
 
@@ -63,6 +65,7 @@ _BOT_COMMANDS = [
     BotCommand(command="vocab", description="Vocabulary cards"),
     BotCommand(command="repeat", description="Review saved word history"),
     BotCommand(command="exit", description="Cancel the active session"),
+    BotCommand(command="settings", description="Configure your profile and preferences"),
     BotCommand(command="help", description="Show help"),
 ]
 

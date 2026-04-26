@@ -68,6 +68,24 @@ class WritingThemesResponse(msgspec.Struct):
     themes: list[WritingThemeDTO]
 
 
+class ProfileResponse(msgspec.Struct):
+    user_id: str
+    level: str
+    goal: str
+    native_lang: str
+    target_lang: str
+    reminder_enabled: bool
+    reminder_time: str
+    utc_offset: int
+    vocab_card_count: int
+    question_count: int
+    episode_duration_min: int
+    learning_strategy: list[str]
+    vocab_scheduler_enabled: bool
+    vocab_scheduler_time: str
+    vocab_scheduler_deck_id: str = ""
+
+
 class StartWritingSessionResponse(msgspec.Struct):
     session_id: str
     task: str  # writing task instructions shown to the user

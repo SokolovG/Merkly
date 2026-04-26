@@ -75,6 +75,7 @@ class StartSessionUseCase:
                 recent_topics=[],
                 question_count=profile.question_count,
             )
+            self._refiller.schedule_article_refill(profile)
 
         await self._session_history.record(profile.id, url, ActivityType.READING)
         session_id = str(uuid.uuid4())
@@ -115,6 +116,7 @@ class StartSessionUseCase:
             title = lesson.title
             episode_url = lesson.episode_url
             questions = lesson.questions
+            self._refiller.schedule_listening_refill(profile)
             content = lesson.transcript[:_TEXT_PREVIEW_CHARS]
 
         await self._session_history.record(profile.id, episode_url, ActivityType.LISTENING)

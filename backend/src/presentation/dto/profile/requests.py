@@ -17,3 +17,5 @@ class UpdateProfileRequest(msgspec.Struct, omit_defaults=True):
     question_count: int | None = None
     episode_duration_min: int | None = None
     learning_strategy: list[ActivityType] | None = None
+    vocab_scheduler_enabled: bool | None = None
+    vocab_scheduler_time: str | None = None

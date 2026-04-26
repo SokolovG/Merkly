@@ -19,7 +19,7 @@ def help_text(count: int = 8) -> str:
         f"/vocab — Vocabulary cards (default: {count})\n"
         "  · <code>/vocab 5</code> — specific count\n"
         "  · <code>/vocab travel 10</code> — topic + count\n"
-        "/repeat — Review your saved word history\n\n"
+        # "/repeat — Review your saved word history\n\n" # TODO
         "<b>Other:</b>\n"
         "/exit — Cancel the active session early\n"
         "/help — Show this message\n\n"

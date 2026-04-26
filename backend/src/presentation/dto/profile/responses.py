@@ -18,3 +18,4 @@ class ProfileResponse(msgspec.Struct):
     learning_strategy: list[str]
     vocab_scheduler_enabled: bool
     vocab_scheduler_time: str
+    vocab_scheduler_deck_id: str = ""

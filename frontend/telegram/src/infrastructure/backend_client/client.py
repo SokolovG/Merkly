@@ -16,6 +16,7 @@ from src.infrastructure.backend_client.types import (
     AnswerResponse,
     CaptureWordResponse,
     IdentityLookupResponse,
+    ProfileResponse,
     RepeatVocabResponse,
     StartSessionResponse,
     StartWritingSessionResponse,
@@ -229,3 +230,24 @@ class BackendClient:
         response.raise_for_status()
         raw: dict[str, Any] = msgspec.json.decode(response.content)
         return msgspec.convert(_unwrap(raw), CaptureWordResponse)
+
+    # --- Profile ---
+
+    async def get_profile(self, user_id: str) -> ProfileResponse:
+        response = await self._client.get(
+            f"/api/profiles/{user_id}",
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        raw: dict[str, Any] = msgspec.json.decode(response.content)
+        return msgspec.convert(_unwrap(raw), ProfileResponse)
+
+    async def update_profile(self, user_id: str, **fields: Any) -> ProfileResponse:
+        response = await self._client.patch(
+            f"/api/profiles/{user_id}",
+            json={k: v for k, v in fields.items() if v is not None},
+            headers=self._headers(),
+        )
+        response.raise_for_status()
+        raw: dict[str, Any] = msgspec.json.decode(response.content)
+        return msgspec.convert(_unwrap(raw), ProfileResponse)

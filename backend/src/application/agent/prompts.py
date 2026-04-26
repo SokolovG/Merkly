@@ -356,8 +356,9 @@ Instructions:
 1. Be HONEST and CRITICAL. If an answer is incomplete, vague, or missing key details from the article — say so explicitly.
 2. Point out every grammar or vocabulary mistake with a correction.
 3. If an answer is simply wrong, explain the correct answer using the article.
-4. Write feedback in {name}. Show corrections also in {native_name} so the student understands.
+4. Write ALL feedback in {name} only. Do NOT use the student's native language at any point.
 5. Do NOT start your response with greetings or thank-you phrases (e.g. "Hello!", "Thank you for your answers!"). Begin directly with the feedback.
+6. Use plain text only — no markdown, no asterisks, no bullet symbols. Use numbered lists if needed.
 
 Do NOT be overly positive if the answers are incomplete. The student should know exactly what they missed.
 Do NOT create flashcards — this is comprehension feedback only.

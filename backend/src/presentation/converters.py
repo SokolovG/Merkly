@@ -57,4 +57,5 @@ def profile_to_response(profile: UserProfile) -> ProfileResponse:
         learning_strategy=list(profile.learning_strategy),
         vocab_scheduler_enabled=profile.vocab_scheduler_enabled,
         vocab_scheduler_time=profile.vocab_scheduler_time,
+        vocab_scheduler_deck_id=profile.vocab_scheduler_deck_id,
     )

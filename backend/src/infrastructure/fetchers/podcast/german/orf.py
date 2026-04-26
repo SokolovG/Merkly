@@ -10,7 +10,6 @@ from backend.src.infrastructure.fetchers.podcast.utils import parse_duration
 logger = logging.getLogger(__name__)
 
 _ORF_FEEDS = [
-    "https://podcast.orf.at/podcast/oe1/oe1_wissen_aktuell/oe1_wissen_aktuell.xml",
     "https://podcast.orf.at/podcast/oe1/oe1_digitalleben/oe1_digitalleben.xml",
     "https://podcast.orf.at/podcast/oe1/oe1_journale/oe1_journale.xml",
 ]

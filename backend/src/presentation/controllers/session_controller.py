@@ -167,12 +167,12 @@ class SessionController(Controller):
         """
         try:
             platform_enum = Platform(platform)
-        except ValueError:
+        except ValueError as e:
             raise ApiException(
                 message=f"Unknown platform: {platform!r}",
                 status_code=400,
                 error_code="VALIDATION_ERROR",
-            )
+            ) from e
 
         ctx = await resolver.resolve(platform_enum, contact_id)
         themes = await writing_uc.get_themes(ctx.profile, limit=count)
@@ -215,21 +215,17 @@ class SessionController(Controller):
         agent: FromDishka[LessonAgent],
         store: FromDishka[RedisSessionStore],
     ) -> SuccessResponse:
-        """Accumulate answers; once all received, run LLM review and return feedback."""
+        """Run LLM review on the submitted answers and return feedback.
+
+        The Telegram frontend sends all answers in a single message, so we always
+        review immediately rather than accumulating across multiple requests.
+        """
         session = await store.get(session_id)
         if session is None:
             raise NotFoundException(detail="Session expired or not found") from None
 
         session["user_answers"].extend(data.answers)
-        answered = len(session["user_answers"])
-        total = session["question_count"]
-
-        if answered < total:
-            await store.save(session, user_id=session["user_id"])
-            return SuccessResponse(
-                data=AnswerResponse(feedback="", writing_available=False, cards=[]),
-                message="Answer recorded",
-            )
+        await store.save(session, user_id=session["user_id"])
 
         feedback, _ = await agent.review_answers(
             article_text=session["text"],

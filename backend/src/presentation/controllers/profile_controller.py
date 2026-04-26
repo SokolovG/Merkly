@@ -8,6 +8,7 @@ from litestar import Controller, get, patch
 from litestar.exceptions import NotFoundException
 
 from backend.src.domain.entities import UserProfile
+from backend.src.domain.utils import compute_next_reminder_at
 from backend.src.infrastructure.database.repositories.profile_repo import ProfileRepository
 from backend.src.presentation.converters import profile_to_response
 from backend.src.presentation.dto.profile.requests import UpdateProfileRequest
@@ -20,7 +21,20 @@ def _apply_update(profile: UserProfile, data: UpdateProfileRequest) -> UserProfi
         for f in msgspec.structs.fields(data)
         if getattr(data, f.name) is not None
     }
-    return msgspec.structs.replace(profile, **overrides)
+    updated = msgspec.structs.replace(profile, **overrides)
+    # Recompute next_reminder_at when reminder settings change
+    reminder_fields = {"reminder_enabled", "reminder_time", "utc_offset"}
+    if reminder_fields & overrides.keys():
+        if updated.reminder_enabled:
+            updated = msgspec.structs.replace(
+                updated,
+                next_reminder_at=compute_next_reminder_at(
+                    updated.reminder_time, updated.utc_offset
+                ),
+            )
+        else:
+            updated = msgspec.structs.replace(updated, next_reminder_at=None)
+    return updated
 
 
 class ProfileController(Controller):
